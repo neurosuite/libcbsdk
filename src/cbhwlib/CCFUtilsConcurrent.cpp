@@ -25,7 +25,7 @@ static char THIS_FILE[]=__FILE__;
 using namespace ccf;
 
 // Author & Date: Ehsan Azar       10 June 2012
-// Purpose: Helper function to read CCF without interaction 
+// Purpose: Helper function to read CCF without interaction
 //           (unthreaded and with forced conversion inside a thread)
 //           Since it is forced conversion, confirmation should be made beforehand
 // Inputs:
@@ -37,7 +37,7 @@ using namespace ccf;
 void ReadCCFHelper(QString strFileName, bool bSend, cbCCF * pCCF, cbCCFCallback pCallbackFn, UINT32 nInstance)
 {
     // make sure byte array is constructed, thus we can use the internal pointer to character data
-    const QByteArray tmp = strFileName.toAscii();
+    const QByteArray tmp = strFileName.toLatin1();
     LPCSTR szFileName = tmp;
     if (pCallbackFn)
         pCallbackFn(nInstance, CCFRESULT_SUCCESS, szFileName, CCFSTATE_THREADREAD, 0);
@@ -57,7 +57,7 @@ void ccf::ConReadCCF(LPCSTR szFileName, bool bSend, cbCCF * pCCF, cbCCFCallback 
 }
 
 // Author & Date: Ehsan Azar       10 June 2012
-// Purpose: Helper function to write CCF without interaction 
+// Purpose: Helper function to write CCF without interaction
 //           (unthreaded inside a thread)
 // Inputs:
 //   szFileName  - the name of the file to write to (if NULL sends to NSP)
@@ -66,7 +66,7 @@ void ccf::ConReadCCF(LPCSTR szFileName, bool bSend, cbCCF * pCCF, cbCCFCallback 
 void WriteCCFHelper(QString strFileName, cbCCF ccf, cbCCFCallback pCallbackFn, UINT32 nInstance)
 {
     // make sure byte array is constructed, thus we can use the internal pointer to character data
-    const QByteArray tmp = strFileName.toAscii();
+    const QByteArray tmp = strFileName.toLatin1();
     LPCSTR szFileName = tmp;
     QThread::currentThread()->setPriority(QThread::LowestPriority);
     if (pCallbackFn)
@@ -90,4 +90,3 @@ void ccf::ConWriteCCF(LPCSTR szFileName, cbCCF * pCCF, cbCCFCallback pCallbackFn
     // Parameters are copied before thread starts, originals will go out of scope
     QtConcurrent::run(WriteCCFHelper, strFileName, ccf, pCallbackFn, nInstance);
 }
-

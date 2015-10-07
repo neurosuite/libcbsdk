@@ -1,4 +1,4 @@
-// =STS=> CCFUtilsXmlItems.cpp[4878].aa03   open     SMID:3 
+// =STS=> CCFUtilsXmlItems.cpp[4878].aa03   open     SMID:3
 //////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2012-2013 Blackrock Microsystems
@@ -1180,7 +1180,7 @@ template<>
 void ccf::ReadItem(XmlFile * const xml, char item[], int count)
 {
     QString var = xml->value().toString();
-    strncpy(item, var.toAscii().constData(), count);
+    strncpy(item, var.toLatin1().constData(), count);
     item[count - 1] = 0;
 }
 

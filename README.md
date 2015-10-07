@@ -1,19 +1,10 @@
-CereLink
+libcbsdk
 ========
 
-Blackrock Microsystems Cerebus Link
+A C++ library that allows you to interact with Blackrock Microsystems neural signal processing hardware.
 
-The software develoment kit for Blackrock Microsystems neural signal processing hardware includes:
+This is a fork of [CereLink](https://github.com/dashesy/CereLink) turned it into a standalone C++ library, similar to the CBSDK that comes with Central, without the Matlab dependency, but with Qt5 support and proper CMake package files.
 
-c++ library (cbsdk): cross platform library for two-way communication with hardware
+In theory the library should be 100% compatible with any code that previously worked with the *official* CBSDK as long as it only uses the ```cbSdk...``` functions.
 
-MATLAB/Octave wrapper (cbmex): MATLAB executable (mex) to configure and pull data using cbsdk
-
-Python wrapper (cbpy): Python binding for cbsdk to configure, pull data, and receive callbacks
-
-File conversion utility (n2h5): Converts nsx and nev files to hdf5 format
-
-
-# Project wiki
-
-https://github.com/dashesy/CereLink/wiki
+For more infos and general trouble shooting please see the upstream source repository [dashesy/CereLink](https://github.com/dashesy/CereLink).
