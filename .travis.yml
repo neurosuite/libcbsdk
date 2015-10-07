@@ -1,0 +1,11 @@
+language: cpp
+
+env:
+  - QT_PACKAGE=libqt4-dev
+  - QT_PACKAGE=qtbase5-dev
+
+before_install: sudo apt-get update
+
+install: sudo apt-get install -y $QT_PACKAGE
+
+script: mkdir build && cd build && cmake ..

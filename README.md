@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/neurosuite/libcbsdk.svg)](https://travis-ci.org/neurosuite/libcbsdk)
+
 libcbsdk
 ========
 
