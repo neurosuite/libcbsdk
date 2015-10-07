@@ -1,3 +1,5 @@
+# Copyright (C) 2015 Florian Franzen
+
 ########################
 # Include header files #
 ########################

@@ -1,3 +1,4 @@
+# Copyright (C) 2015 Florian Franzen
 project(cbsdk)
 cmake_minimum_required(VERSION 2.8.12)
 
