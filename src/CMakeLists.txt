@@ -56,7 +56,7 @@ endif(WIN32)
 set(INCLUDE_FILE_DESTINATION "include/cbsdk")
 
 install(TARGETS cbsdk EXPORT targets
-        LIBRARY DESTINATION lib
+        DESTINATION lib
         INCLUDES DESTINATION ${INCLUDE_FILE_DESTINATION})
 
 set(HEADER_FILES
@@ -69,7 +69,11 @@ install(FILES ${HEADER_FILES} DESTINATION ${INCLUDE_FILE_DESTINATION})
 ##############################
 # Create CMake package files #
 ##############################
-set(CMAKE_PACKAGE_FILE_DESTINATION "lib/cmake/${PROJECT_NAME}")
+if(WIN32)
+    set(CMAKE_PACKAGE_FILE_DESTINATION "CMake")
+else()
+    set(CMAKE_PACKAGE_FILE_DESTINATION "lib/cmake/${PROJECT_NAME}")
+endif()
 
 # Install config file directly
 install(EXPORT targets
@@ -87,5 +91,4 @@ write_basic_package_version_file(
 install(
   FILES "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
   DESTINATION ${CMAKE_PACKAGE_FILE_DESTINATION}
-  COMPONENT Development
 )
