@@ -2,11 +2,12 @@
 project(cbsdk CXX)
 cmake_minimum_required(VERSION 2.8.12)
 
-set(CBSDK_VERSION_MAJOR 6)
-set(CBSDK_VERSION_MINOR 4)
-set(CBSDK_VERSION_PATCH 0)
-set(CBSDK_VERSION
-${CBSDK_VERSION_MAJOR}.${CBSDK_VERSION_MINOR}.${CBSDK_VERSION_PATCH})
+set(PROJECT_VERSION_MAJOR 6)
+set(PROJECT_VERSION_MINOR 4)
+set(PROJECT_VERSION_PATCH 0)
+set(PROJECT_VERSION
+    "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}"
+)
 
 # Options
 option(WITH_QT4
@@ -37,6 +38,9 @@ endif(APPLE)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+# Detect 64bit build
+set(PROJECT_IS_64BIT CMAKE_SIZEOF_VOID_P EQUAL 8)
+
 #####################
 # Find dependencies #
 #####################
@@ -49,91 +53,34 @@ else()
     find_package(Qt5Xml REQUIRED)
 endif()
 
+
 ########################
-# Include header files #
+# Include subdirectory #
 ########################
-include_directories(
-    src/cbhwlib
-    src/Central
-    src/CentralCommon
-)
-
-if(WIN32)
-    # Include windows specific headers
-    include_directories(src/compat)
-endif(WIN32)
-
-#################
-# Build library #
-#################
-set(SRC_FILES
-    src/cbsdk.cpp
-    src/cbhwlib/cbhwlib.cpp
-    src/cbhwlib/cbHwlibHi.cpp
-    src/cbhwlib/CCFUtils.cpp
-    src/cbhwlib/CCFUtilsBinary.cpp
-    src/cbhwlib/CCFUtilsConcurrent.cpp
-    src/cbhwlib/CCFUtilsXml.cpp
-    src/cbhwlib/CCFUtilsXmlItems.cpp
-    src/cbhwlib/InstNetwork.cpp
-    src/cbhwlib/XmlFile.cpp
-    src/Central/Instrument.cpp
-    src/Central/UDPsocket.cpp
-)
-
-add_library(cbsdk SHARED ${SRC_FILES})
-
-################
-# Link library #
-################
-if(WITH_QT4)
-    target_link_libraries(cbsdk Qt4::QtCore Qt4::QtXml)
-else()
-    target_link_libraries(cbsdk Qt5::Concurrent Qt5::Xml)
-endif()
-
-if(WIN32)
-    # Windows sockets require theses libraries
-    target_link_libraries(cbsdk ws2_32 winmm)
-endif(WIN32)
-
-###################
-# Install library #
-###################
-# Group headers in same subfolder
-set(INCLUDE_FILE_DESTINATION "include/cbsdk")
-
-install(TARGETS cbsdk EXPORT targets
-        DESTINATION lib
-        INCLUDES DESTINATION ${INCLUDE_FILE_DESTINATION})
-
-set(HEADER_FILES
-    src/cbsdk.h
-    src/cbhwlib/cbhwlib.h
-)
-
-install(FILES ${HEADER_FILES} DESTINATION ${INCLUDE_FILE_DESTINATION})
+# Build main library
+add_subdirectory(src)
 
 ##############################
 # Create CMake package files #
 ##############################
 set(CMAKE_PACKAGE_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/cmake")
 
-# Create targets file
-export(TARGETS targets
-       FILE "${CMAKE_PACKAGE_BUILD_DIR}/${PROJECT_NAME}Targets.cmake"
-)
+# Create targets file (disabled, does not work in cmake < 3.0.0)
+# export(EXPORT LibraryTargets
+#        FILE "${CMAKE_PACKAGE_BUILD_DIR}/${PROJECT_NAME}Targets.cmake"
+# )
 
 # Create config file
-configure_file(cmake/PackageConfig.cmake
+configure_file(cmake/PackageConfig.cmake.in
     "${CMAKE_PACKAGE_BUILD_DIR}/${PROJECT_NAME}Config.cmake"
-    @ONLY)
+    @ONLY
+)
 
 # Create version file
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
     "${CMAKE_PACKAGE_BUILD_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-    VERSION ${CBSDK_VERSION}
+    VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
 
@@ -153,6 +100,57 @@ install(FILES "${CMAKE_PACKAGE_BUILD_DIR}/${PROJECT_NAME}Config.cmake"
 )
 
 # Install target
-install(EXPORT targets
+install(EXPORT LibraryTargets
         DESTINATION ${CMAKE_PACKAGE_FILE_DESTINATION}
-        FILE "${PROJECT_NAME}Targets.cmake")
+        FILE "${PROJECT_NAME}Targets.cmake"
+)
+
+######################
+# CPack Configuriton #
+######################
+set(CPACK_PACKAGE_NAME "lib${PROJECT_NAME}")
+set(CPACK_PACKAGE_CONTACT "Florian Franzen <FlorianFranzen@gmail.com>")
+
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Library to interact with Blackrock Microsystems neural signal processing hardware")
+
+set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+
+if(WIN32)
+    set(CPACK_GENERATOR "NSIS")
+    if(PROJECT_IS_64BIT)
+        set(CPACK_SYSTEM_NAME "win64")
+    else()
+        set(CPACK_SYSTEM_NAME "win32")
+    endif()
+elseif(APPLE)
+    set(CPACK_GENERATOR "ZIP")
+    set(CPACK_SYSTEM_NAME "osx")
+else()
+    set(CPACK_GENERATOR "DEB")
+
+    if(PROJECT_IS_64BIT)
+        set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+    else()
+        set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "i386")
+    endif()
+    set(CPACK_SYSTEM_NAME "${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}")
+
+    if(WITH_QT4)
+        set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt4-xml (>= 4.8.0)")
+    else()
+        set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt5concurrent5, libqt5xml5")
+    endif()
+
+    set(CPACK_DEBIAN_PACKAGE_SECTION "Science")
+    set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://neurosuite.github.io/")
+endif()
+
+if(WITH_QT4)
+    set(CPACK_SYSTEM_NAME "${CPACK_SYSTEM_NAME}-qt4")
+else()
+    set(CPACK_SYSTEM_NAME "${CPACK_SYSTEM_NAME}-qt5")
+endif()
+
+include(CPack)

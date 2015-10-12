@@ -1,8 +1,8 @@
 # Find packages of dependencies
 include(CMakeFindDependencyMacro)
 
-set(WITH_QT4 @WITH_QT4@)
-if(WITH_QT4)
+set(@PROJECT_NAME@_WITH_QT4 @WITH_QT4@)
+if(@PROJECT_NAME@_WITH_QT4)
     find_dependency(Qt4 REQUIRED QtXml)
 else()
     find_dependency(Qt5Concurrent REQUIRED)
