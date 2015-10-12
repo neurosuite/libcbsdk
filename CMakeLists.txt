@@ -120,7 +120,7 @@ install(FILES ${HEADER_FILES} DESTINATION ${INCLUDE_FILE_DESTINATION})
 set(CMAKE_PACKAGE_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/cmake")
 
 # Create targets file
-export(EXPORT targets
+export(TARGETS targets
        FILE "${CMAKE_PACKAGE_BUILD_DIR}/${PROJECT_NAME}Targets.cmake"
 )
 
