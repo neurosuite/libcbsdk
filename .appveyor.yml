@@ -1,0 +1,20 @@
+version: v6.4.0-{branch}-{build}
+
+os: MinGW
+
+environment:
+  MINIMAL_PATH: C:\Windows\system32;C:\Perl\site\bin;C:\Perl\bin;C:\Python27;C:\Ruby193\bin;C:\Windows;C:\Program Files (x86)\CMake\bin;C:\Program Files\AppVeyor\BuildAgent\;
+  matrix:
+  - QTDIR: C:\Qt\5.4\msvc2013_64_opengl
+    CMAKE_GENERATOR: Visual Studio 12 Win64
+    EXTRA_PATH:
+  - QTDIR: C:\Qt\5.4\mingw491_32
+    CMAKE_GENERATOR: MinGW Makefiles
+    EXTRA_PATH: C:\Qt\Tools\mingw491_32\bin
+
+build_script:
+    - set OLD_PATH=%PATH%
+    - set PATH=%MINIMAL_PATH%;%QTDIR%\bin;%EXTRA_PATH%
+    - cmake -G "%CMAKE_GENERATOR%" .
+    - cmake --build .
+    - set PATH=%OLD_PATH%
