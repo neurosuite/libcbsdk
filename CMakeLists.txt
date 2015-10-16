@@ -65,10 +65,10 @@ add_subdirectory(src)
 ##############################
 set(CMAKE_PACKAGE_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/cmake")
 
-# Create targets file (disabled, does not work in cmake < 3.0.0)
-# export(EXPORT LibraryTargets
-#        FILE "${CMAKE_PACKAGE_BUILD_DIR}/${PROJECT_NAME}Targets.cmake"
-# )
+# Create targets file
+export(TARGETS cbsdk
+       FILE "${CMAKE_PACKAGE_BUILD_DIR}/${PROJECT_NAME}Targets.cmake"
+)
 
 # Create config file
 configure_file(cmake/PackageConfig.cmake.in
