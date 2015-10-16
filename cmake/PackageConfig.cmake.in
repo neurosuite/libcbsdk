@@ -3,10 +3,10 @@ include(CMakeFindDependencyMacro)
 
 set(@PROJECT_NAME@_WITH_QT4 @WITH_QT4@)
 if(@PROJECT_NAME@_WITH_QT4)
-    find_dependency(Qt4 REQUIRED QtXml)
+    find_dependency(Qt4)
 else()
-    find_dependency(Qt5Concurrent REQUIRED)
-    find_dependency(Qt5Xml REQUIRED)
+    find_dependency(Qt5Concurrent)
+    find_dependency(Qt5Xml)
 endif()
 
 # Make sure the headers do not use AFX
