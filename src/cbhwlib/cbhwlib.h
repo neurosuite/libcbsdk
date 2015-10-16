@@ -353,6 +353,8 @@ typedef unsigned int cbRESULT;
 #define cbRESULT_INSTINVALID       24   // Invalid range or instrument address
 #define cbRESULT_SOCKBIND          25   // Cannot bind to any address (possibly no Instrument network)
 #define cbRESULT_SYSLOCK           26   // Cannot (un)lock the system resources (possiblly resource busy)
+#define cbRESULT_INSTOUTDATED      27   // The instrument runs an outdated protocol version
+#define cbRESULT_LIBOUTDATED       28   // The library is outdated
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
