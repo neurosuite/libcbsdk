@@ -71,7 +71,7 @@ export(TARGETS cbsdk
 )
 
 # Create config file
-configure_file(cmake/PackageConfig.cmake.in
+configure_file(cmake/PackageConfig.cmake
     "${CMAKE_PACKAGE_BUILD_DIR}/${PROJECT_NAME}Config.cmake"
     @ONLY
 )
@@ -108,49 +108,26 @@ install(EXPORT LibraryTargets
 ######################
 # CPack Configuriton #
 ######################
-set(CPACK_PACKAGE_NAME "lib${PROJECT_NAME}")
-set(CPACK_PACKAGE_CONTACT "Florian Franzen <FlorianFranzen@gmail.com>")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+include(PackNeurosuite)
+# Init CPack variables
+neurosuite_cpack_init("lib${PROJECT_NAME}"
+                       ${PROJECT_VERSION}
+                       "Florian Franzen <FlorianFranzen@gmail.com"
+                       "Library to interact with Blackrock Microsystems neural signal processing hardware"
+                       OFF)
 
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Library to interact with Blackrock Microsystems neural signal processing hardware")
-
-set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
-set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
-set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
-
-if(WIN32)
-    set(CPACK_GENERATOR "NSIS")
-    if(PROJECT_IS_64BIT)
-        set(CPACK_SYSTEM_NAME "win64")
-    else()
-        set(CPACK_SYSTEM_NAME "win32")
-    endif()
-elseif(APPLE)
-    set(CPACK_GENERATOR "ZIP")
-    set(CPACK_SYSTEM_NAME "osx")
-else()
-    set(CPACK_GENERATOR "DEB")
-
-    if(PROJECT_IS_64BIT)
-        set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
-    else()
-        set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "i386")
-    endif()
-    set(CPACK_SYSTEM_NAME "${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}")
-
-    if(WITH_QT4)
-        set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt4-xml (>= 4.8.0)")
-    else()
-        set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt5concurrent5, libqt5xml5")
-    endif()
-
-    set(CPACK_DEBIAN_PACKAGE_SECTION "Science")
-    set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://neurosuite.github.io/")
-endif()
-
+# Use deb and rpm on linux
 if(WITH_QT4)
-    set(CPACK_SYSTEM_NAME "${CPACK_SYSTEM_NAME}-qt4")
+    neurosuite_cpack_ubuntu(
+        "libqt4-xml"
+        OFF
+    )
 else()
-    set(CPACK_SYSTEM_NAME "${CPACK_SYSTEM_NAME}-qt5")
+    neurosuite_cpack_ubuntu(
+        "libqt5concurrent5, libqt5xml5"
+        OFF
+    )
 endif()
 
 include(CPack)
