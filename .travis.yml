@@ -22,5 +22,5 @@ deploy:
   file_glob: true
   file: libcbsdk_*.deb
   on:
-    repo: neurosuite/libcbsdk
+    tags: true
     condition: "$TRAVIS_OS_NAME = linux && $QT_VERSION = qt4"
