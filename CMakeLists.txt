@@ -27,6 +27,10 @@ add_definitions(-DQT_APP)
 if(WIN32)
     # To build on windows the following definitions are needed
     add_definitions(-DWIN32 -D_WINDOWS -DWINVER=0x0501 -DNO_AFX)
+    if(MSVC)
+        # Some weird versions of MSVC need this
+        add_definitions(-DNOMINMAX)
+    endif()
 endif(WIN32)
 
 if(APPLE)
@@ -37,9 +41,6 @@ endif(APPLE)
 # Configure CMAKE
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-
-# Detect 64bit build
-set(PROJECT_IS_64BIT CMAKE_SIZEOF_VOID_P EQUAL 8)
 
 #####################
 # Find dependencies #
@@ -52,7 +53,6 @@ else()
     find_package(Qt5Concurrent REQUIRED)
     find_package(Qt5Xml REQUIRED)
 endif()
-
 
 ########################
 # Include subdirectory #
