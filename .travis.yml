@@ -3,13 +3,24 @@ language: cpp
 sudo: required
 
 os:
-  - linux
-  - osx
+- linux
+- osx
 
 env:
-  - QT_VERSION=qt4
-  - QT_VERSION=qt5
+- QT_VERSION=qt4
+- QT_VERSION=qt5
 
 install: source .travis/install.sh
 
-script: ./.travis/script.sh
+script: "./.travis/script.sh"
+
+deploy:
+  provider: releases
+  api_key:
+    secure: TWsM24z6t/i9R+D+BUG++klagYcSNZNydNUNTlsfAkpXQmrSraVF7BM2lzSYG4ANfmrNtuehSZw9dadi7mN305UqjBYNpyNqbpXQTC/HpNRNfdc5peu784TBGU7SItadykti952smbwj6+ML7BwM1C357uH6AC0a5IRryryMA22EL9ROKFaK3IqhCmzd6JIKfTAbAlv5xyAWlC4zQIdfsfG6pqu4MyA+zb31ybP5y+LTdA/CzcVLQvZEoey3SF678kyU3qJN5bQ6IgyuR/QROjM3hi9LXX1FH4uCkz3O/Ki+abfcgv+oBxDwu7ivUg9zr/AKVJPcFaTH1d79CRxlAfRSBh/jxX3SjV+GW7PodO6s7I9fGdRD07DjclerwW0IXFsuwkof9VHanNV9amu6VVEbY4Lh4UptPRsEJ2UpFpDXbJ1lblC7HB8LJqi3U9h1jCzswTcpXaicSY3nxUD7NJEFgLt/TC/glO7sdjiO5hEfeW6x3LyJ/LAOtmUIO54ZfrWFbOMsN3TWHIWMDKZnYhZSIlcJ2I1RVgADhMUDMIKDAGcGOp6WckyrBDMf6aU/ODYpS3+GYsRfL+y83rDeG2CeGzQcw/VfMUzQP+TRfZSFR95a/MkL/A/fV4YCaf5otfGGYFcRm1f3YyjqPwixWhy6mGcnKGZXiDSZTzdRhaw=
+  skip_cleanup: true
+  file_glob: true
+  file: libcbsdk_*.deb
+  on:
+    repo: neurosuite/libcbsdk
+    condition: "$TRAVIS_OS_NAME = linux && $QT_VERSION = qt4"
