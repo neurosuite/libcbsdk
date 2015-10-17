@@ -4,7 +4,7 @@ environment:
   matrix:
   - QTDIR: C:\Qt\5.5\msvc2013_64
     CMAKE_GENERATOR: Visual Studio 12 Win64
-  - QTDIR: C:\Qt\5.5\msvc2013_32
+  - QTDIR: C:\Qt\5.5\msvc2013
     CMAKE_GENERATOR: Visual Studio 12
 
 install:
