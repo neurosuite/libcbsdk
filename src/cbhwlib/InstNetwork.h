@@ -97,7 +97,7 @@ private:
     void UpdateSortModel(const cbPKT_SS_MODELSET & rUnitModel);
     void UpdateBasisModel(const cbPKT_FS_BASIS & rBasisModel);
 private:
-    static const UINT32 MAX_NUM_OF_PACKETS_TO_PROCESS_PER_PASS = 5000;
+    static const UINT32 MAX_NUM_OF_PACKETS_TO_PROCESS_PER_PASS;
     cbLevelOfConcern m_enLOC; // level of concern
     STARTUP_OPTIONS m_nStartupOptionsFlags;
     QVector<Listener *> m_listener;   // instrument network listeners

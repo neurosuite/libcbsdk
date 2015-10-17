@@ -14,12 +14,12 @@
 //
 //////////////////////////////////////////////////////////////////////
 
+// Use C++ default min and max implementation.
+#include <algorithm>
+
 #include "StdAfx.h"
 #include "debugmacs.h"
 #include "Instrument.h"
-
-// Keep this after all headers
-#include "compat.h"
 
 // table of starting ip addresses for each NSP (128 channels)
 //	indexed by NSP number:
@@ -153,7 +153,7 @@ Instrument::ModeType Instrument::GetSendMode()
     ModeType ret = static_cast<ModeType>(0);
     for (CachedPacket * pCache = m_aicCache; pCache != ARRAY_END(m_aicCache); ++pCache)
     {
-        ret = max(ret, pCache->GetMode());
+        ret = std::max(ret, pCache->GetMode());
     }
     return ret;
 }

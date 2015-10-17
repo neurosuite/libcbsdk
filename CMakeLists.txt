@@ -26,11 +26,7 @@ add_definitions(-DQT_APP)
 
 if(WIN32)
     # To build on windows the following definitions are needed
-    add_definitions(-DWIN32 -D_WINDOWS -DWINVER=0x0501 -DNO_AFX)
-    if(MSVC)
-        # Some weird versions of MSVC need this
-        add_definitions(-DNOMINMAX)
-    endif()
+    add_definitions(-DWIN32 -D_WINDOWS -DWINVER=0x0501 -DNOMINMAX)
 endif(WIN32)
 
 if(APPLE)
