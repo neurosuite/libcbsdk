@@ -1,12 +1,17 @@
 version: v6.4.0-{branch}-{build}
 
 environment:
-    QTDIR: C:\Qt\5.5\msvc2013_64
+  matrix:
+  - QTDIR: C:\Qt\5.5\msvc2013_64
     CMAKE_GENERATOR: Visual Studio 12 Win64
+  - QTDIR: C:\Qt\5.5\msvc2013_32
+    CMAKE_GENERATOR: Visual Studio 12
 
 install:
-    - set PATH=%PATH%;%QTDIR%\bin
+  - set PATH=%PATH%;%QTDIR%\bin
 
 build_script:
-    - cmake -G "%CMAKE_GENERATOR%" .
-    - cmake --build .
+  - cmake -G "%CMAKE_GENERATOR%" .
+  - cmake --build .
+
+test: off
