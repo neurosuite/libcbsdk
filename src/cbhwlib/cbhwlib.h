@@ -51,16 +51,16 @@
 #define CBHWLIB_H_INCLUDED
 
 // Only standard headers might be included here
-#if defined(WIN32)
-#ifndef _CRT_SECURE_NO_DEPRECATE
-#define _CRT_SECURE_NO_DEPRECATE
+#ifdef WIN32
+    #ifndef _CRT_SECURE_NO_DEPRECATE
+        #define _CRT_SECURE_NO_DEPRECATE
+    #endif
+
+    // It has to be in this order for right version of sockets
+    #include <winsock2.h>
+    #include <windows.h>
 #endif
-// It has to be in this order for right version of sockets
-#ifdef NO_AFX
-#include <winsock2.h>
-#include <windows.h>
-#endif
-#endif
+
 #ifdef __cplusplus
 #include <string.h>
 #endif

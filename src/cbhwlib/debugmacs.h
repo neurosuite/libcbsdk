@@ -46,10 +46,8 @@
             #define _CRT_SECURE_NO_DEPRECATE
             #define _CRT_SECURE_NO_WARNINGS
         #endif
-        #ifdef NO_AFX
-            #include <winsock2.h>
-            #include <windows.h>
-        #endif
+        #include <winsock2.h>
+        #include <windows.h>
         #include <conio.h>
         #ifdef TRACE
             #undef TRACE
