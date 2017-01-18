@@ -218,6 +218,16 @@ typedef enum _cbSdkTrialType
     CBSDKTRIAL_TRACKING,
 } cbSdkTrialType;
 
+typedef enum _cbSdkSampleGroup {
+    CBSDKSAMPLEGROUP_NONE = 0,
+    CBSDKSAMPLEGROUP_RATE_500 = 1,
+    CBSDKSAMPLEGROUP_RATE_1K = 2,
+    CBSDKSAMPLEGROUP_RATE_2K = 3,
+    CBSDKSAMPLEGROUP_RATE_10k = 4,
+    CBSDKSAMPLEGROUP_RATE_30k = 5,
+    CBSDKSAMPLEGROUP_RAW = 6
+} cbSdkSampleGroup;
+
 typedef void (* cbSdkCallback)(UINT32 nInstance, const cbSdkPktType type, const void* pEventData, void* pCallbackData);
 // pEventData points to a cbPkt_* structure depending on the type
 // pCallbackData is what is used to register the callback
