@@ -1,18 +1,39 @@
 language: cpp
 
-sudo: required
+sudo: false
+dist: trusty
 
 os:
 - linux
 - osx
 
+compiler:
+- clang
+- gcc
+
 env:
 - QT_VERSION=qt4
 - QT_VERSION=qt5
 
-install: source .travis/install.sh
+matrix:
+  include:
+    os: linux
+    env: QT_VERSION=qt4
+    addons:
+      apt:
+        packages:
+          - libqt4-dev
+  include:
+    os: linux
+    env: QT_VERSION=qt5
+    addons:
+      apt:
+        packages:
+          - qtbase5-dev
 
-script: "./.travis/script.sh"
+install: ".travis/install.sh"
+
+script: ".travis/script.sh"
 
 deploy:
   provider: releases
@@ -23,4 +44,4 @@ deploy:
   file: "${TRAVIS_BUILD_DIR}/build/libcbsdk_*.deb"
   on:
     tags: true
-    condition: "$TRAVIS_OS_NAME = linux && $QT_VERSION = qt4"
+    condition: "$TRAVIS_OS_NAME = linux && $QT_VERSION = qt5"
