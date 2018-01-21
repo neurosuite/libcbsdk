@@ -17,19 +17,22 @@ env:
 
 matrix:
   include:
-    os: linux
+  - os: linux
     env: QT_VERSION=qt4
     addons:
       apt:
         packages:
           - libqt4-dev
-  include:
-    os: linux
+  - os: linux
     env: QT_VERSION=qt5
     addons:
       apt:
         packages:
           - qtbase5-dev
+  exclude:
+  - os: osx
+    compiler: gcc
+
 
 install: ".travis/install.sh"
 
