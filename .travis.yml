@@ -3,18 +3,6 @@ language: cpp
 sudo: false
 dist: trusty
 
-os:
-- linux
-- osx
-
-compiler:
-- clang
-- gcc
-
-env:
-- QT_VERSION=qt4
-- QT_VERSION=qt5
-
 matrix:
   include:
   - os: linux
@@ -45,18 +33,17 @@ matrix:
       apt:
         packages:
           - qtbase5-dev
-  exclude:
   - os: osx
-    compiler: gcc
-  - os: osx
-    env: QT_VERSION=qt4
+    env: QT_VERSION=qt5
+    compiler: clang
 
 
 install:
 - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install qt; fi
 
 script:
-- if [ $QT_VERSION = "qt4" ]; then CMAKE_ARGS="-DWITH_QT4=ON"; fi
+- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export PATH="/usr/local/opt/qt/bin:$PATH"; fi
+- if [[ "$QT_VERSION"     == "qt4" ]]; then CMAKE_ARGS="-DWITH_QT4=ON"; fi
 - mkdir build && cd build && cmake $CMAKE_ARGS .. && make package
 
 deploy:
