@@ -19,12 +19,28 @@ matrix:
   include:
   - os: linux
     env: QT_VERSION=qt4
+    compiler: clang
+    addons:
+      apt:
+        packages:
+          - libqt4-dev
+  - os: linux
+    env: QT_VERSION=qt4
+    compiler: gcc
     addons:
       apt:
         packages:
           - libqt4-dev
   - os: linux
     env: QT_VERSION=qt5
+    compiler: clang
+    addons:
+      apt:
+        packages:
+          - qtbase5-dev
+  - os: linux
+    env: QT_VERSION=qt5
+    compiler: gcc
     addons:
       apt:
         packages:
@@ -32,11 +48,16 @@ matrix:
   exclude:
   - os: osx
     compiler: gcc
+  - os: osx
+    env: QT_VERSION=qt4
 
 
-install: ".travis/install.sh"
+install:
+- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install qt; fi
 
-script: ".travis/script.sh"
+script:
+- if [ $QT_VERSION = "qt4" ]; then CMAKE_ARGS="-DWITH_QT4=ON"; fi
+- mkdir build && cd build && cmake $CMAKE_ARGS .. && make package
 
 deploy:
   provider: releases
