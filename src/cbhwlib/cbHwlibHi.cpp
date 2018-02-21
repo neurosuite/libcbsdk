@@ -1,8 +1,8 @@
-// =STS=> cbHwlibHi.cpp[1688].aa22   submit   SMID:23 
+// =STS=> cbHwlibHi.cpp[1688].aa26   submit   SMID:27 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2003 - 2008 Cyberkinetics, Inc.
-// (c) Copyright 2008 - 2012 Blackrock Microsystems
+// (c) Copyright 2008 - 2013 Blackrock Microsystems
 //
 // $Workfile: cbHwlibHi.cpp $
 // $Archive: /Cerebus/WindowsApps/cbhwlib/cbHwlibHi.cpp $
@@ -82,66 +82,113 @@ bool IsRawProcessingEnabled(UINT32 nChan, UINT32 nInstance)
 
 
 // TRUE means yes; FALSE, no
-bool IsChanSerial(UINT32 dwChan)
+bool IsChanSerial(UINT32 dwChan, UINT32 nInstance)
 {
-    if ((dwChan >= MIN_CHANS_SERIAL) && (dwChan <= MAX_CHANS_SERIAL))
-        return true;
+    UINT32 dwChanCaps;
+    UINT32 dwDiginCaps;
 
-    return false;
+    return ((dwChan >= MIN_CHANS) &&
+            (cbGetChanCaps(dwChan, &dwChanCaps, nInstance) == cbRESULT_OK) && 
+            (dwChanCaps & cbCHAN_DINP) &&
+            (cbGetDinpCaps(dwChan, &dwDiginCaps, nInstance) == cbRESULT_OK) && 
+            (dwDiginCaps & cbDINP_SERIALMASK));
 }
 
 
 // TRUE means yes; FALSE, no
-bool IsChanDigin(UINT32 dwChan)
+bool IsChanDigin(UINT32 dwChan, UINT32 nInstance)
 {
-    if ((dwChan >= MIN_CHANS_DIGITAL_IN) && (dwChan <= MAX_CHANS_DIGITAL_IN))
-        return true;
+    UINT32 dwChanCaps;
+    UINT32 dwDiginCaps;
 
-    return false;
+    return ((dwChan >= MIN_CHANS) &&
+            (cbGetChanCaps(dwChan, &dwChanCaps, nInstance) == cbRESULT_OK) && 
+            (dwChanCaps & cbCHAN_DINP) &&
+            (cbGetDinpCaps(dwChan, &dwDiginCaps, nInstance) == cbRESULT_OK) && 
+            !(dwDiginCaps & cbDINP_SERIALMASK));
 }
 
-bool IsChanDigout(UINT32 dwChan)
+bool IsChanDigout(UINT32 dwChan, UINT32 nInstance)
 {
-    if ((dwChan >= MIN_CHANS_DIGITAL_OUT) && (dwChan <= MAX_CHANS_DIGITAL_OUT))
-        return true;
+    UINT32 dwChanCaps;
 
-    return false;
+    return ((dwChan >= MIN_CHANS) &&
+            (cbGetChanCaps(dwChan, &dwChanCaps, nInstance) == cbRESULT_OK) && 
+        (dwChanCaps & cbCHAN_DOUT));
 }
 
 
 // Author & Date:   Almut Branner   15 Jan 2004
 // Purpose: Find out whether an analog in channel
 // Input:   nChannel - the channel ID that we want to check
-bool IsChanAnalogIn(UINT32 dwChan)
+bool IsChanAnalogIn(UINT32 dwChan, UINT32 nInstance)
 {
-    if ((dwChan >= MIN_CHANS) && (dwChan <= MAX_CHANS_ANALOG_IN))
-        return true;
+    UINT32 dwChanCaps;
 
-    return false;
+    return ((dwChan >= MIN_CHANS) &&
+            (cbGetChanCaps(dwChan, &dwChanCaps, nInstance) == cbRESULT_OK) && 
+            (dwChanCaps & cbCHAN_AINP));
 }
 
 
 // Author & Date:   Almut Branner   15 Jan 2004
 // Purpose: Find out whether a channel is a Front-End analog in channel
 // Input:   nChannel - the channel ID that we want to check
-bool IsChanFEAnalogIn(UINT32 dwChan)
+bool IsChanFEAnalogIn(UINT32 dwChan, UINT32 nInstance)
 {
-    if ((dwChan >= MIN_CHANS) && (dwChan <= MAX_CHANS_FRONT_END))
-        return true;
+    UINT32 dwChanCaps;
 
-    return false;
+    return ((dwChan >= MIN_CHANS) &&
+            (cbGetChanCaps(dwChan, &dwChanCaps, nInstance) == cbRESULT_OK) && 
+            (dwChanCaps & (cbCHAN_AINP | cbCHAN_ISOLATED)));
 }
 
 
 // Author & Date:   Almut Branner   15 Jan 2004
 // Purpose: Find out whether a channel is a Analog-In analog in channel
 // Input:   nChannel - the channel ID that we want to check
-bool IsChanAIAnalogIn(UINT32 dwChan)
+bool IsChanAIAnalogIn(UINT32 dwChan, UINT32 nInstance)
 {
-    if ((dwChan >= MIN_CHANS_ANALOG_IN) && (dwChan <= MAX_CHANS_ANALOG_IN))
-        return true;
+    UINT32 dwChanCaps;
 
-    return false;
+    return ((dwChan >= MIN_CHANS) &&
+            (cbGetChanCaps(dwChan, &dwChanCaps, nInstance) == cbRESULT_OK) && 
+            (dwChanCaps & cbCHAN_AINP) &&
+            !(dwChanCaps & cbCHAN_ISOLATED));
+}
+
+
+/// @author Hyrum L. Sessions
+/// @date   14 Feb 2017
+/// @brief  Find out whether a channel is an Analog Out channel, don't include audio out
+// Input:   nChannel - the channel ID that we want to check
+bool IsChanAnalogOut(UINT32 dwChan, UINT32 nInstance)
+{
+    UINT32 dwChanCaps;
+    UINT32 dwAnaOutCaps;
+
+    return ((dwChan >= MIN_CHANS) &&
+            (cbGetChanCaps(dwChan, &dwChanCaps, nInstance) == cbRESULT_OK) && 
+            (cbGetAoutCaps(dwChan, &dwAnaOutCaps, NULL, NULL, nInstance) == cbRESULT_OK) &&
+            (dwChanCaps & cbCHAN_AOUT) &&
+            ((dwAnaOutCaps & cbAOUT_AUDIO) == 0));
+}
+
+
+/// @author Hyrum L. Sessions
+/// @date   20 Feb 2017
+/// @brief  Find out whether a channel is an Audio Out channel
+// Input:   nChannel - the channel ID that we want to check
+bool IsChanAudioOut(UINT32 dwChan, UINT32 nInstance)
+{
+    UINT32 dwChanCaps;
+    UINT32 dwAnaOutCaps;
+
+    return ((dwChan >= MIN_CHANS) &&
+            (cbGetChanCaps(dwChan, &dwChanCaps, nInstance) == cbRESULT_OK) && 
+            (cbGetAoutCaps(dwChan, &dwAnaOutCaps, NULL, NULL, nInstance) == cbRESULT_OK) &&
+            (dwChanCaps & cbCHAN_AOUT) &&
+            ((dwAnaOutCaps & cbAOUT_AUDIO) == cbAOUT_AUDIO));
 }
 
 
@@ -167,24 +214,23 @@ bool IsChanCont(UINT32 dwChan, UINT32 nInstance)
 bool IsChannelEnabled(UINT32 nChannel, UINT32 nInstance)
 {
     ASSERT(nChannel >=1);
-    ASSERT(nChannel <= MAX_CHANS_DIGITAL_OUT);
 
-    if (nChannel <= MAX_CHANS_ANALOG_IN)
+    if (IsChanAnalogIn(nChannel))
         return IsAnalogInEnabled(nChannel);
 
-    if (nChannel <= MAX_CHANS_ANALOG_OUT)
+    if (IsChanAnalogOut(nChannel))
         return IsAnalogOutEnabled(nChannel);
 
-    if (nChannel <= MAX_CHANS_AUDIO)
+    if (!IsChanDigout(nChannel))
         return IsAudioEnabled(nChannel);
 
-    if (nChannel <= MAX_CHANS_DIGITAL_IN)
+    if (IsChanDigin(nChannel))
         return IsDigitalInEnabled(nChannel);
 
-    if (nChannel <= MAX_CHANS_SERIAL)
+    if (IsChanSerial(nChannel))
         return IsSerialEnabled(nChannel, nInstance);
 
-    if (nChannel <= MAX_CHANS_DIGITAL_OUT)
+    if (IsChanDigout(nChannel))
         return IsDigitalOutEnabled(nChannel, nInstance);
 
     return false;
@@ -266,7 +312,7 @@ bool IsSerialEnabled(UINT32 nChannel, UINT32 nInstance)
 bool IsDigitalOutEnabled(UINT32 nChannel, UINT32 nInstance)
 {
     UINT32 nOptions;
-    cbGetDoutOptions(nChannel, &nOptions, NULL, NULL, nInstance);
+    cbGetDoutOptions(nChannel, &nOptions, NULL, NULL, NULL, NULL, NULL, nInstance);
 
     return (nOptions & cbDOUT_1BIT) ? true : false;
 }
@@ -363,33 +409,69 @@ cbRESULT cbSetSpikeSorting(UINT32 dwChan, UINT32 spkSrtOpt, UINT32 nInstance)
 // Input:   nChannel = channel to track   1 - based
 void TrackChannel(UINT32 nChannel, UINT32 nInstance)
 {
-    // Only do this if the channel is a analog input channel
-    if ( (nChannel >= MIN_CHANS) && (nChannel <= MAX_CHANS_ANALOG_IN) )
+    INT32 smpdispmax = 0;
+    INT32 spkdispmax = 0;
+
+    // Only do this if the channel is an analog input channel
+    if (IsChanAnalogIn(nChannel))
     {
         // scan through the analog output channels
         // if channel exists and is set to track, update its source channel
-        {for (int aoutch = MIN_CHANS_ANALOG_OUT; aoutch <= MAX_CHANS_AUDIO; ++aoutch)
+        for (UINT32 nOutCh = MIN_CHANS; nOutCh <= cb_pc_status_buffer_ptr[0]->cbGetNumTotalChans(); ++nOutCh) //1-based ch numbering, 0 is reserved
         {
-            UINT32 options, monchan, value;
-            if (cbGetAoutOptions(aoutch, &options, &monchan, &value, nInstance)==cbRESULT_OK)
+            if (IsChanAnalogOut(nOutCh) || IsChanAudioOut(nOutCh))
             {
-                if (options & cbAOUT_TRACK)
+                UINT32 options, monchan, value;
+                if (cbGetAoutOptions(nOutCh, &options, &monchan, &value, nInstance)==cbRESULT_OK)
                 {
-                    cbSetAoutOptions(aoutch, options, nChannel, value, nInstance);
+                    if (options & cbAOUT_TRACK)
+                    {
+                        cbSetAoutOptions(nOutCh, options, nChannel, value, nInstance);
+
+                        ///// Now adjust any of the analog output monitoring /////
+                        // Get the input scaling
+                        cbSCALING isInScaling;
+                        ::cbGetAinpDisplay(nChannel, NULL, &smpdispmax, &spkdispmax, NULL);
+                        ::cbGetAinpScaling(nChannel, &isInScaling, nInstance);
+
+                        if (options & cbAOUT_MONITORSMP)      // Monitoring the continuous signal
+                        {
+                            INT32 nAnaMax = smpdispmax * isInScaling.anamax / isInScaling.digmax;
+                            cbSCALING isOutScaling;
+
+                            isOutScaling.digmin = -smpdispmax;
+                            isOutScaling.digmax =  smpdispmax;
+                            isOutScaling.anamin = -nAnaMax;
+                            isOutScaling.anamax =  nAnaMax;
+                            strncpy(isOutScaling.anaunit, isInScaling.anaunit, sizeof(isOutScaling.anaunit));
+                            ::cbSetAoutScaling(nOutCh, &isOutScaling, nInstance);
+                        }
+                        if (options & cbAOUT_MONITORSPK) // Monitoring the spikes
+                        {
+                            INT32 nAnaMax = spkdispmax * isInScaling.anamax / isInScaling.digmax;
+                            cbSCALING isOutScaling;
+
+                            isOutScaling.digmin = -spkdispmax;
+                            isOutScaling.digmax =  spkdispmax;
+                            isOutScaling.anamin = -nAnaMax;
+                            isOutScaling.anamax =  nAnaMax;
+                            strncpy(isOutScaling.anaunit, isInScaling.anaunit, sizeof(isOutScaling.anaunit));
+                            ::cbSetAoutScaling(nOutCh, &isOutScaling, nInstance);
+                        }
+                    }
                 }
             }
-        }}
-
-        // Now scan through the Digital Out channels and set them
-        for (int nChan = MIN_CHANS_DIGITAL_OUT; nChan <= MAX_CHANS_DIGITAL_OUT; ++nChan)
-        {
-            UINT32 nOptions, nVal;
-            if (cbRESULT_OK == ::cbGetDoutOptions(nChan, &nOptions, NULL, &nVal, nInstance))
+            // Now scan through the Digital Out channels and set them
+            if (IsChanDigout(nOutCh))
             {
-                // Now if we are set to track, then change the monitored channel
-                if (nOptions & cbDOUT_TRACK)
+                UINT32 nOptions, nVal;
+                if (cbRESULT_OK == ::cbGetDoutOptions(nOutCh, &nOptions, NULL, &nVal, NULL, NULL, NULL, nInstance))
                 {
-                    ::cbSetDoutOptions(nChan, nOptions, nChannel, nVal, nInstance);
+                    // Now if we are set to track, then change the monitored channel
+                    if (nOptions & cbDOUT_TRACK)
+                    {
+                        ::cbSetDoutOptions(nOutCh, nOptions, nChannel, nVal, cbDOUT_TRIGGER_NONE, 0, 0, nInstance);
+                    }
                 }
             }
         }
@@ -420,47 +502,50 @@ cbRESULT cbSetAnaInOutDisplay(UINT32 chan, INT32 smpdispmax, INT32 spkdispmax, I
 
     // There are 6 analog channels of interest
     // They happen to be numbered so that AnalogOut and AudioOut are continuous
-    for (UINT32 nAnaChan = MIN_CHANS_ANALOG_OUT; nAnaChan <= MAX_CHANS_AUDIO; ++nAnaChan)
+    for (UINT32 nAnaChan = MIN_CHANS; nAnaChan <= cb_pc_status_buffer_ptr[0]->cbGetNumTotalChans(); ++nAnaChan) //1-based ch numbering, 0 is reserved
     {
-        UINT32 dwOptions = 0;
-        UINT32 dwMonChan = 0;
-        ::cbGetAoutOptions(nAnaChan, &dwOptions, &dwMonChan, NULL, nInstance);
-
-        if (dwMonChan == chan)
+        if (IsChanAnalogOut(nAnaChan) || IsChanAudioOut(nAnaChan))
         {
-            // Get the input scaling
-            cbSCALING isInScaling;
-            retVal = ::cbGetAinpScaling(chan, &isInScaling, nInstance);
-            if (retVal != cbRESULT_OK)
-                return retVal;
+            UINT32 dwOptions = 0;
+            UINT32 dwMonChan = 0;
+            ::cbGetAoutOptions(nAnaChan, &dwOptions, &dwMonChan, NULL, nInstance);
 
-            if (dwOptions & cbAOUT_MONITORSMP)      // Monitoring the continuous signal
+            if (dwMonChan == chan)
             {
-                INT32 nAnaMax = smpdispmax * isInScaling.anamax / isInScaling.digmax;
-                cbSCALING isOutScaling;
-
-                isOutScaling.digmin = -smpdispmax;
-                isOutScaling.digmax =  smpdispmax;
-                isOutScaling.anamin = -nAnaMax;
-                isOutScaling.anamax =  nAnaMax;
-                strncpy(isOutScaling.anaunit, isInScaling.anaunit, sizeof(isOutScaling.anaunit));
-                retVal = ::cbSetAoutScaling(nAnaChan, &isOutScaling, nInstance);
+                // Get the input scaling
+                cbSCALING isInScaling;
+                retVal = ::cbGetAinpScaling(chan, &isInScaling, nInstance);
                 if (retVal != cbRESULT_OK)
                     return retVal;
-            }
-            else if (dwOptions & cbAOUT_MONITORSPK) // Monitoring the spikes
-            {
-                INT32 nAnaMax = spkdispmax * isInScaling.anamax / isInScaling.digmax;
-                cbSCALING isOutScaling;
 
-                isOutScaling.digmin = -spkdispmax;
-                isOutScaling.digmax =  spkdispmax;
-                isOutScaling.anamin = -nAnaMax;
-                isOutScaling.anamax =  nAnaMax;
-                strncpy(isOutScaling.anaunit, isInScaling.anaunit, sizeof(isOutScaling.anaunit));
-                retVal = ::cbSetAoutScaling(nAnaChan, &isOutScaling, nInstance);
-                if (retVal != cbRESULT_OK)
-                    return retVal;
+                if (dwOptions & cbAOUT_MONITORSMP)      // Monitoring the continuous signal
+                {
+                    INT32 nAnaMax = smpdispmax * isInScaling.anamax / isInScaling.digmax;
+                    cbSCALING isOutScaling;
+
+                    isOutScaling.digmin = -smpdispmax;
+                    isOutScaling.digmax =  smpdispmax;
+                    isOutScaling.anamin = -nAnaMax;
+                    isOutScaling.anamax =  nAnaMax;
+                    strncpy(isOutScaling.anaunit, isInScaling.anaunit, sizeof(isOutScaling.anaunit));
+                    retVal = ::cbSetAoutScaling(nAnaChan, &isOutScaling, nInstance);
+                    if (retVal != cbRESULT_OK)
+                        return retVal;
+                }
+                else if (dwOptions & cbAOUT_MONITORSPK) // Monitoring the spikes
+                {
+                    INT32 nAnaMax = spkdispmax * isInScaling.anamax / isInScaling.digmax;
+                    cbSCALING isOutScaling;
+
+                    isOutScaling.digmin = -spkdispmax;
+                    isOutScaling.digmax =  spkdispmax;
+                    isOutScaling.anamin = -nAnaMax;
+                    isOutScaling.anamax =  nAnaMax;
+                    strncpy(isOutScaling.anaunit, isInScaling.anaunit, sizeof(isOutScaling.anaunit));
+                    retVal = ::cbSetAoutScaling(nAnaChan, &isOutScaling, nInstance);
+                    if (retVal != cbRESULT_OK)
+                        return retVal;
+                }
             }
         }
     }
@@ -476,7 +561,7 @@ cbRESULT cbSetAnaInOutDisplay(UINT32 chan, INT32 smpdispmax, INT32 spkdispmax, I
 cbRESULT cbGetScaling(UINT32 nChan,
                       UINT32 *anSpikeScale,
                       UINT32 *anContScale,
-                      UINT32 *anLncScale, 
+                      UINT32 *anLncScale,
                       UINT32 nInstance)
 {
     cbRESULT retVal;
@@ -484,7 +569,7 @@ cbRESULT cbGetScaling(UINT32 nChan,
     INT32 nAnaMax;
     int i;
 
-    if (nChan < MIN_CHANS || nChan > MAX_CHANS_ANALOG_IN)
+    if (!IsChanAnalogIn(nChan))
         return cbRESULT_INVALIDCHANNEL;
 
     retVal = ::cbGetAinpScaling(nChan, &isScaling, nInstance);
@@ -493,7 +578,7 @@ cbRESULT cbGetScaling(UINT32 nChan,
 
     nAnaMax = isScaling.anamax / isScaling.anagain;
 
-    if (nChan <= MAX_CHANS_FRONT_END)
+    if (IsChanFEAnalogIn(nChan))
     {
 
         if (anContScale)
@@ -852,3 +937,194 @@ bool IsFileRecording(UINT32 nInstance)
     }
     return false;
 }
+
+/// @author     Hyrum L. Sessions
+/// @date       24 Feb 2017
+/// @brief      Get the channel number of the specified ordinal digin channel
+///             e.g. on a 128 channel system, the 1st digin channel is 151
+///
+/// @param [in] nOrdinal 1 based ordinal digin to find
+/// @return     Channel number of the ordinal digin, 0 if none exist or invalid ordinal
+UINT32 GetAIAnslogInChanNumber(UINT32 nOrdinal, UINT32 nInstance)
+{
+    UINT32 nReturn = 0;
+    UINT32 nChan;
+    UINT32 nMaxChan = cb_pc_status_buffer_ptr[nInstance]->cbGetNumTotalChans();
+
+    if (1 <= nOrdinal)
+    {
+        for (nChan = MIN_CHANS; nChan <= nMaxChan; ++nChan)
+        {
+            if (IsChanAIAnalogIn(nChan, nInstance) && (0 == --nOrdinal))
+            {
+                nReturn = nChan;
+                break;
+            }
+        }
+    }
+    return nReturn;
+}
+
+/// @author     Hyrum L. Sessions
+/// @date       24 Feb 2017
+/// @brief      Get the channel number of the specified ordinal digin channel
+///             e.g. on a 128 channel system, the 1st digin channel is 151
+///
+/// @param [in] nOrdinal 1 based ordinal digin to find
+/// @return     Channel number of the ordinal digin, 0 if none exist or invalid ordinal
+UINT32 GetAnalogOutChanNumber(UINT32 nOrdinal, UINT32 nInstance)
+{
+    UINT32 nReturn = 0;
+    UINT32 nChan;
+    UINT32 nMaxChan = cb_pc_status_buffer_ptr[nInstance]->cbGetNumTotalChans();
+
+    if (1 <= nOrdinal)
+    {
+        for (nChan = MIN_CHANS; nChan <= nMaxChan; ++nChan)
+        {
+            if (IsChanAnalogOut(nChan, nInstance) && (0 == --nOrdinal))
+            {
+                nReturn = nChan;
+                break;
+            }
+        }
+    }
+    return nReturn;
+}
+
+/// @author     Hyrum L. Sessions
+/// @date       24 Feb 2017
+/// @brief      Get the channel number of the specified ordinal digin channel
+///             e.g. on a 128 channel system, the 1st digin channel is 151
+///
+/// @param [in] nOrdinal 1 based ordinal digin to find
+/// @return     Channel number of the ordinal digin, 0 if none exist or invalid ordinal
+UINT32 GetAudioOutChanNumber(UINT32 nOrdinal, UINT32 nInstance)
+{
+    UINT32 nReturn = 0;
+    UINT32 nChan;
+    UINT32 nMaxChan = cb_pc_status_buffer_ptr[nInstance]->cbGetNumTotalChans();
+
+    if (1 <= nOrdinal)
+    {
+        for (nChan = MIN_CHANS; nChan <= nMaxChan; ++nChan)
+        {
+            if (IsChanAudioOut(nChan, nInstance) && (0 == --nOrdinal))
+            {
+                nReturn = nChan;
+                break;
+            }
+        }
+    }
+    return nReturn;
+}
+
+/// @author     Hyrum L. Sessions
+/// @date       27 Feb 2017
+/// @brief      Get the channel number of the specified ordinal analog or audio channel
+///             e.g. on a 128 channel system, the 1st digin channel is 145
+///
+/// @param [in] nOrdinal 1 based ordinal digin to find
+/// @return     Channel number of the ordinal digin, 0 if none exist or invalid ordinal
+UINT32 GetAnalogOrAudioOutChanNumber(UINT32 nOrdinal, UINT32 nInstance)
+{
+    UINT32 nReturn = 0;
+    UINT32 nChan;
+    UINT32 nMaxChan = cb_pc_status_buffer_ptr[nInstance]->cbGetNumTotalChans();
+
+    if (1 <= nOrdinal)
+    {
+        for (nChan = MIN_CHANS; nChan <= nMaxChan; ++nChan)
+        {
+            if ((IsChanAnalogOut(nChan, nInstance) || IsChanAudioOut(nChan, nInstance)) && 
+                (0 == --nOrdinal))
+            {
+                nReturn = nChan;
+                break;
+            }
+        }
+    }
+    return nReturn;
+}
+
+/// @author     Hyrum L. Sessions
+/// @date       24 Feb 2017
+/// @brief      Get the channel number of the specified ordinal digin channel
+///             e.g. on a 128 channel system, the 1st digin channel is 151
+///
+/// @param [in] nOrdinal 1 based ordinal digin to find
+/// @return     Channel number of the ordinal digin, 0 if none exist or invalid ordinal
+UINT32 GetDiginChanNumber(UINT32 nOrdinal, UINT32 nInstance)
+{
+    UINT32 nReturn = 0;
+    UINT32 nChan;
+    UINT32 nMaxChan = cb_pc_status_buffer_ptr[nInstance]->cbGetNumTotalChans();
+
+    if (1 <= nOrdinal)
+    {
+        for (nChan = MIN_CHANS; nChan <= nMaxChan; ++nChan)
+        {
+            if (IsChanDigin(nChan, nInstance) && (0 == --nOrdinal))
+            {
+                nReturn = nChan;
+                break;
+            }
+        }
+    }
+    return nReturn;
+}
+
+/// @author     Hyrum L. Sessions
+/// @date       24 Feb 2017
+/// @brief      Get the channel number of the specified ordinal digin channel
+///             e.g. on a 128 channel system, the 1st digin channel is 151
+///
+/// @param [in] nOrdinal 1 based ordinal digin to find
+/// @return     Channel number of the ordinal digin, 0 if none exist or invalid ordinal
+UINT32 GetSerialChanNumber(UINT32 nOrdinal, UINT32 nInstance)
+{
+    UINT32 nReturn = 0;
+    UINT32 nChan;
+    UINT32 nMaxChan = cb_pc_status_buffer_ptr[nInstance]->cbGetNumTotalChans();
+
+    if (1 <= nOrdinal)
+    {
+        for (nChan = MIN_CHANS; nChan <= nMaxChan; ++nChan)
+        {
+            if (IsChanSerial(nChan, nInstance) && (0 == --nOrdinal))
+            {
+                nReturn = nChan;
+                break;
+            }
+        }
+    }
+    return nReturn;
+}
+
+/// @author     Hyrum L. Sessions
+/// @date       24 Feb 2017
+/// @brief      Get the channel number of the specified ordinal digin channel
+///             e.g. on a 128 channel system, the 1st digin channel is 151
+///
+/// @param [in] nOrdinal 1 based ordinal digin to find
+/// @return     Channel number of the ordinal digin, 0 if none exist or invalid ordinal
+UINT32 GetDigoutChanNumber(UINT32 nOrdinal, UINT32 nInstance)
+{
+    UINT32 nReturn = 0;
+    UINT32 nChan;
+    UINT32 nMaxChan = cb_pc_status_buffer_ptr[nInstance]->cbGetNumTotalChans();
+
+    if (1 <= nOrdinal)
+    {
+        for (nChan = MIN_CHANS; nChan <= nMaxChan; ++nChan)
+        {
+            if (IsChanDigout(nChan, nInstance) && (0 == --nOrdinal))
+            {
+                nReturn = nChan;
+                break;
+            }
+        }
+    }
+    return nReturn;
+}
+

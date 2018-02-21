@@ -1,4 +1,4 @@
-/* =STS=> cki_common.h[1693].aa07   open     SMID:7 */
+/* =STS=> cki_common.h[1693].aa07   submit   SMID:8 */
 ///////////////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2002 - 2006 Cyberkinetics, Inc.
@@ -39,7 +39,8 @@ enum STARTUP_OPTIONS
     OPT_NONE        = 0x00000000,
     OPT_ANY_IP      = 0x00000001,       // set if we want to bind to whatever ip address is available
     OPT_LOOPBACK    = 0x00000002,       // set if we want to try the loopback ip address
-	OPT_LOCAL       = 0x00000003        // set if we want to connect to lacalhost
+    OPT_LOCAL       = 0x00000003,       // set if we want to connect to lacalhost
+    OPT_REUSE       = 0X00000004        // set if we want to allow other connections to the port
 };
 
 // The two cart types. Research gives advanced options to the researchers

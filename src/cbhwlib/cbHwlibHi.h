@@ -1,8 +1,8 @@
-/* =STS=> cbHwlibHi.h[1689].aa11   submit   SMID:13 */
+/* =STS=> cbHwlibHi.h[1689].aa13   submit   SMID:15 */
 //////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2003-2008 Cyberkinetics, Inc.
-// (c) Copyright 2008-2012 Blackrock Microsystems
+// (c) Copyright 2008-2013 Blackrock Microsystems
 //
 // $Workfile: cbHwlibHi.h $
 // $Archive: /Cerebus/WindowsApps/cbhwlib/cbHwlibHi.h $
@@ -72,17 +72,28 @@ bool IsSerialEnabled(UINT32 nChannel, UINT32 nInstance = 0);
 bool IsDigitalOutEnabled(UINT32 nChannel, UINT32 nInstance = 0);
 
 // Is it "this" kind of channel? (very fast)
-bool IsChanAnalogIn(UINT32 dwChan);             // TRUE means yes; FALSE, no
-bool IsChanFEAnalogIn(UINT32 dwChan);           // TRUE means yes; FALSE, no
-bool IsChanAIAnalogIn(UINT32 dwChan);           // TRUE means yes; FALSE, no
-bool IsChanSerial(UINT32 dwChan);               // TRUE means yes; FALSE, no
-bool IsChanDigin(UINT32 dwChan);                // TRUE means yes; FALSE, no
-bool IsChanDigout(UINT32 dwChan);               // TRUE means yes; FALSE, no
+bool IsChanAnalogIn(UINT32 dwChan, UINT32 nInstance = 0);             // TRUE means yes; FALSE, no
+bool IsChanFEAnalogIn(UINT32 dwChan, UINT32 nInstance = 0);           // TRUE means yes; FALSE, no
+bool IsChanAIAnalogIn(UINT32 dwChan, UINT32 nInstance = 0);           // TRUE means yes; FALSE, no
+bool IsChanSerial(UINT32 dwChan, UINT32 nInstance = 0);               // TRUE means yes; FALSE, no
+bool IsChanDigin(UINT32 dwChan, UINT32 nInstance = 0);                // TRUE means yes; FALSE, no
+bool IsChanDigout(UINT32 dwChan, UINT32 nInstance = 0);               // TRUE means yes; FALSE, no
+bool IsChanAnalogOut(UINT32 dwChan, UINT32 nInstance = 0);            // TRUE means yes; FALSE, no
+bool IsChanAudioOut(UINT32 dwChan, UINT32 nInstance = 0);             // TRUE means yes; FALSE, no
+
 bool IsChanCont(UINT32 dwChan, UINT32 nInstance = 0);                 // TRUE means yes; FALSE, no
 
 bool AreHoopsDefined(UINT32 nChannel, UINT32 nInstance = 0);
 bool AreHoopsDefined(UINT32 nChannel, UINT32 nUnit, UINT32 nInstance = 0);
 
+// Get channel number from ordinal
+UINT32 GetAIAnslogInChanNumber(UINT32 nOrdinal, UINT32 nInstance = 0);
+UINT32 GetAnalogOutChanNumber(UINT32 nOrdinal, UINT32 nInstance = 0);
+UINT32 GetAudioOutChanNumber(UINT32 nOrdinal, UINT32 nInstance = 0);
+UINT32 GetAnalogOrAudioOutChanNumber(UINT32 nOrdinal, UINT32 nInstance = 0);
+UINT32 GetDiginChanNumber(UINT32 nOrdinal, UINT32 nInstance = 0);
+UINT32 GetSerialChanNumber(UINT32 nOrdinal, UINT32 nInstance = 0);
+UINT32 GetDigoutChanNumber(UINT32 nOrdinal, UINT32 nInstance = 0);
 
 // Author & Date:   Ehsan Azar   June 3, 2009
 // Purpose: determine if a channel has  valid sorting unit

@@ -1,7 +1,6 @@
-/* =STS=> InstNetwork.h[2733].aa08   open     SMID:8 */
 //////////////////////////////////////////////////////////////////////////////
 //
-// (c) Copyright 2010 - 2011 Blackrock Microsystems
+// (c) Copyright 2010 - 2017 Blackrock Microsystems
 //
 // $Workfile: InstNetwork.h $
 // $Archive: /common/InstNetwork.h $
@@ -23,6 +22,7 @@
 
 #include "debugmacs.h"
 #include "cbhwlib.h"
+#include "cbHwlibHi.h"
 #include "Instrument.h"
 #include "cki_common.h"
 #include <QThread>
@@ -86,6 +86,7 @@ public:
     bool IsStandAlone() {return m_bStandAlone;} // If running in stand-alone
     UINT32 getPacketCounter() {return m_nRecentPacketCount;}
     UINT32 getDataCounter() {return m_dataCounter;}
+    void SetNumChans();
 protected:
     enum { INST_TICK_COUNT = 10 };
     void run();
@@ -108,6 +109,7 @@ private:
     UINT32 m_dataCounter;        // data counter
     UINT32 m_nLastNumberOfPacketsReceived;
     UINT32 m_runlevel; // Last runlevel
+    bool m_bInitChanCount;
 protected:
     bool m_bStandAlone;  // If it is stand-alone
     Instrument m_icInstrument;   // The instrument

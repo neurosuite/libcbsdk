@@ -1,4 +1,4 @@
-// =STS=> XmlFile.cpp[2738].aa05   open     SMID:5 
+// =STS=> XmlFile.cpp[5503].aa00   submit   SMID:1 
 //////////////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2010 - 2011 Blackrock Microsystems
@@ -41,7 +41,7 @@ XmlFile::XmlFile(const QString fname, bool bRead) :
     if (fname.isEmpty())
     {
         m_doc.setContent(QString("")); // Start with empty xml
-    } else { 
+    } else {
         if (!bRead || setContent())
         {
             m_doc.setContent(QString("")); // Start with empty xml
@@ -193,7 +193,7 @@ bool XmlFile::beginGroup(QString nodeName, const QMap<QString, QVariant> attribs
         if (i < level - 1)
             m_nodes.append(set);
     }
-    
+
     // Now add the node to the end of the list
     m_nodes.append(set);
 
@@ -216,7 +216,7 @@ bool XmlFile::beginGroup(QString nodeName, const QMap<QString, QVariant> attribs
             {
                 const XmlItem * item = static_cast<const XmlItem *>(value.data());
                 QVariant subval = item->XmlValue();
-                
+
                 if (subval.type() == QVariant::UserType)
                 {
                     const XmlItem * subitem = static_cast<const XmlItem *>(subval.data());
@@ -225,7 +225,7 @@ bool XmlFile::beginGroup(QString nodeName, const QMap<QString, QVariant> attribs
                     // Recursively add this item
                     beginGroup(strSubKey, attribs, subval);
                     endGroup();
-                } 
+                }
                 else if (subval.type() == QVariant::List || subval.type() == QVariant::StringList)
                 {
                     varlst = subval.toList();
@@ -291,7 +291,7 @@ bool XmlFile::beginGroup(QString nodeName, const QMap<QString, QVariant> attribs
 }
 
 // Author & Date: Ehsan Azar       15 June 2010
-// Purpose: Begin a new Xml group or navigate to it if it exists 
+// Purpose: Begin a new Xml group or navigate to it if it exists
 //           (overloaded for single attribute case)
 // Inputs:
 //   nodeName  - the node tag (it can be in the form of relative/path/to/node)
@@ -369,9 +369,9 @@ bool XmlFile::endGroup(bool bSave /* = true */)
         }
 #ifdef DEBUG_XMLFILE
         if (bSave)
-            TRACE("save doc: %s\n", m_doc.toString().toAscii().constData());
+            TRACE("save doc: %s\n", m_doc.toString().toLatin1().constData());
         else
-            TRACE("load doc: %s\n", m_doc.toString().toAscii().constData());
+            TRACE("load doc: %s\n", m_doc.toString().toLatin1().constData());
 #endif
     }
 
@@ -379,7 +379,7 @@ bool XmlFile::endGroup(bool bSave /* = true */)
 }
 
 // Author & Date: Ehsan Azar       12 April 2012
-// Purpose: Get attribute of the current node 
+// Purpose: Get attribute of the current node
 // Inputs:
 //   attrName  - node attribute name
 // Outputs:
@@ -540,7 +540,7 @@ QString XmlFile::toString()
     {
         return m_doc.toString();
     }
-    // Create a document with new root 
+    // Create a document with new root
     QDomDocument doc;
     node = m_nodes.last().cloneNode().toElement();
     if (!node.isNull())

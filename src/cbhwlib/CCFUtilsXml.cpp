@@ -1,4 +1,4 @@
-// =STS=> CCFUtilsXml.cpp[4876].aa03   open     SMID:3 
+// =STS=> CCFUtilsXml.cpp[4876].aa05   submit   SMID:6 
 //////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2012-2013 Blackrock Microsystems
@@ -74,7 +74,7 @@ ccfResult CCFUtilsXml_v1::ReadCCF(LPCSTR szFileName, bool bConvert)
             if (!xml.beginGroup("Sorting"))
             {
                 ccf::ReadItem(&xml, m_data.isSS_Statistics, "Statistics");
-                ccf::ReadItem(&xml, m_data.isSS_NoiseBoundary, cbNUM_ANALOG_CHANS, "NoiseBoundary");
+                ccf::ReadItem(&xml, m_data.isSS_NoiseBoundary, cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans(), "NoiseBoundary");
                 ccf::ReadItem(&xml, m_data.isSS_Detect, "Detect");
                 ccf::ReadItem(&xml, m_data.isSS_ArtifactReject, "ArtifactReject");
                 ccf::ReadItem(&xml, m_data.isSS_Status, "Status");
@@ -141,7 +141,7 @@ ccfResult CCFUtilsXml_v1::WriteCCFNoPrompt(LPCSTR szFileName)
     // Sorting
     {
         lst += GetCCFXmlItem(m_data.isSS_Statistics, "Sorting/Statistics");
-        lst += GetCCFXmlItem(m_data.isSS_NoiseBoundary, cbNUM_ANALOG_CHANS, "Sorting/NoiseBoundary");
+        lst += GetCCFXmlItem(m_data.isSS_NoiseBoundary, cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans(), "Sorting/NoiseBoundary");
         lst += GetCCFXmlItem(m_data.isSS_Detect, "Sorting/Detect");
         lst += GetCCFXmlItem(m_data.isSS_ArtifactReject, "Sorting/ArtifactReject");
         lst += GetCCFXmlItem(m_data.isSS_Status, "Sorting/Status");
@@ -218,7 +218,7 @@ void CCFUtilsXml_v1::Convert(ccf::ccfBinaryData & data)
     m_data.isAdaptInfo = *reinterpret_cast<cbPKT_ADAPTFILTINFO *>(&data.isAdaptInfo);
     m_data.isSS_Detect = *reinterpret_cast<cbPKT_SS_DETECT *>(&data.isSS_Detect);
     m_data.isSS_ArtifactReject = *reinterpret_cast<cbPKT_SS_ARTIF_REJECT *>(&data.isSS_ArtifactReject);
-    for (int i = 0; i < cbNUM_ANALOG_CHANS; ++i)
+    for (int i = 0; i < cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans(); ++i)
         m_data.isSS_NoiseBoundary[i] = *reinterpret_cast<cbPKT_SS_NOISE_BOUNDARY *>(&data.isSS_NoiseBoundary[i]);
     m_data.isSS_Statistics = *reinterpret_cast<cbPKT_SS_STATISTICS *>(&data.isSS_Statistics);
     m_data.isSS_Status = *reinterpret_cast<cbPKT_SS_STATUS *>(&data.isSS_Status);

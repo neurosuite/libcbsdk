@@ -1,4 +1,4 @@
-/* =STS=> StdAfx.h[1724].aa02   open     SMID:2 */
+/* =STS=> StdAfx.h[1724].aa06   submit   SMID:7 */
 /////////////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2003 - 2006 Cyberkinetics, Inc.

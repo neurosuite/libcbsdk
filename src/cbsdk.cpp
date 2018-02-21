@@ -1,31 +1,20 @@
-// =STS=> cbsdk.cpp[5021].aa03   open     SMID:3 
 //////////////////////////////////////////////////////////////////////
-//
-// (c) Copyright 2010 - 2011 Blackrock Microsystems
-//
-// $Workfile: cbsdk.cpp $
-// $Archive: /Cerebus/Human/WindowsApps/cbmex/cbsdk.cpp $
-// $Revision: 1 $
-// $Date: 03/23/11 11:06p $
-// $Author: Ehsan $
-//
-// $NoKeywords: $
-//
+///
+/// @file   cbsdk.cpp
+/// @attention  (c) Copyright 2010 - 2017 Blackrock Microsystems All rights reserved.
+///
+/// @author     Ehsan Azar
+/// @date       23 March 2010
+///
+/// @brief      Cerebus SDK main file.
+///  Notes:
+///   Do NOT throw exceptions, they are evil if cross the shared library.
+///    catch possible exceptions and handle them the earliest possible in this library,
+///    then return error code if cannot recover.
+///   Only functions are exported, no data, and definitely NO classes
+///
+///
 //////////////////////////////////////////////////////////////////////
-//
-// PURPOSE:
-//
-// Cerebus SDK main file
-//
-//  Notes:
-//   Do NOT throw exceptions, they are evil if cross the shared library.
-//    catch possible exceptions and handle them the earliest possible in this library,
-//    then return error code if cannot recover.
-//   Only functions are exported, no data, and definitely NO classes
-//
-
-// Use C++ default min and max implementation.
-#include <algorithm>
 
 #include "StdAfx.h"
 #include "SdkApp.h"
@@ -84,9 +73,11 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 #endif
 
 // Author & Date:   Kirk Korver     03 Aug 2005
-// Purpose: Called when a Sample Group packet (aka continuous data point or LPF) comes in
-// Inputs:
-//  p - the sample group packet
+
+/** Called when a Sample Group packet (aka continuous data point or LPF) comes in.
+*
+* @param[in] pkt the sample group packet
+*/
 void SdkApp::OnPktGroup(const cbPKT_GROUP * const pkt)
 {
     if (!m_bWithinTrial || m_CD == NULL)
@@ -94,14 +85,14 @@ void SdkApp::OnPktGroup(const cbPKT_GROUP * const pkt)
 
     int group = pkt->type;
 
-    // FIXME: add raw group to cbsdk
+    /// \todo FIXME: add raw group to cbsdk
     if (group >= 6)
         return;
 
     // Get information about this group...
     UINT32  period;
     UINT32  length;
-    UINT32  list[cbNUM_ANALOG_CHANS];
+    UINT16  list[cbNUM_ANALOG_CHANS];
     if (cbGetSampleGroupInfo(1, group, NULL, &period, &length, m_nInstance) != cbRESULT_OK)
         return;
     if (cbGetSampleGroupList(1, group, &length, list, m_nInstance) != cbRESULT_OK)
@@ -156,15 +147,17 @@ void SdkApp::OnPktGroup(const cbPKT_GROUP * const pkt)
 
     if (bOverFlow)
     {
-        // TODO: trial continuous buffer overflow event
+        /// \todo trial continuous buffer overflow event
     }
 }
 
 // Author & Date:   Ehsan Azar     24 March 2011
-// Purpose: Called when a spike, digital or serial packet (aka event data) comes in.
-//           Also the trial start and stop are set.
-// Inputs:
-//  pPkt - the event packet
+/** Called when a spike, digital or serial packet (aka event data) comes in.
+*
+* Also the trial start and stop are set.
+*
+* @param[in] pPkt the event packet
+*/
 void SdkApp::OnPktEvent(const cbPKT_GENERIC * const pPkt)
 {
     // check for trial beginning notification
@@ -187,10 +180,10 @@ void SdkApp::OnPktEvent(const cbPKT_GENERIC * const pPkt)
         bool bOverFlow = false;
 
         UINT16 ch = pPkt->chid - 1;
-        if (pPkt->chid == MAX_CHANS_DIGITAL_IN)
-            ch = cbNUM_ANALOG_CHANS;
-        else if (pPkt->chid == MAX_CHANS_SERIAL)
-            ch = cbNUM_ANALOG_CHANS + 1;
+        if (IsChanDigin(pPkt->chid))
+            ch = cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans();
+        else if (IsChanSerial(pPkt->chid))
+            ch = cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans() + 1;
 
         m_lockTrialEvent.lock();
         // double check if buffer is still valid
@@ -207,11 +200,24 @@ void SdkApp::OnPktEvent(const cbPKT_GENERIC * const pPkt)
             {
                 // Store more data
                 m_ED->timestamps[ch][old_write_index] = pPkt->time;
-                if (pPkt->chid == MAX_CHANS_DIGITAL_IN || pPkt->chid == MAX_CHANS_SERIAL)
+                if (IsChanDigin(pPkt->chid) || IsChanSerial(pPkt->chid))
                     m_ED->units[ch][old_write_index] = (UINT16)(pPkt->data[0] & 0x0000ffff);
                 else
                     m_ED->units[ch][old_write_index] = pPkt->type;
                 m_ED->write_index[ch] = new_write_index;
+
+                if (m_bPacketsEvent)
+                {	
+
+                    m_lockGetPacketsEvent.lock();
+                        if (pPkt->time > m_uTrialStartTime)
+                        {
+                            m_bPacketsEvent = FALSE;
+                            m_waitPacketsEvent.wakeAll();
+                        }						
+                    m_lockGetPacketsEvent.unlock();
+                }
+
             }
             else if (m_bChannelMask[pPkt->chid - 1])
                 bOverFlow = true;
@@ -220,7 +226,7 @@ void SdkApp::OnPktEvent(const cbPKT_GENERIC * const pPkt)
 
         if (bOverFlow)
         {
-            // TODO: trial continuous buffer overflow event
+            /// \todo trial continuous buffer overflow event
         }
     }
 
@@ -233,9 +239,10 @@ void SdkApp::OnPktEvent(const cbPKT_GENERIC * const pPkt)
 }
 
 // Author & Date:   Ehsan Azar     27 Oct 2011
-// Purpose: Called when a comment packet comes in.
-// Inputs:
-//  pPkt - the comment packet
+/** Called when a comment packet comes in.
+*
+* @param[in] pPkt the comment packet
+*/
 void SdkApp::OnPktComment(const cbPKT_COMMENT * const pPkt)
 {
     if (m_CMT && m_bWithinTrial)
@@ -259,13 +266,74 @@ void SdkApp::OnPktComment(const cbPKT_COMMENT * const pPkt)
                 {
                     m_CMT->rgba[write_index] = 0;
                     m_CMT->timestamps[write_index] = pPkt->data;
-                } else {
+                }
+                else
+                {
                     m_CMT->rgba[write_index]  = pPkt->data;
                     m_CMT->timestamps[write_index] = pPkt->time;
                 }
 
                 strncpy((char *)m_CMT->comments[write_index], (const char *)(&pPkt->comment[0]), cbMAX_COMMENT);
                 m_CMT->write_index = new_write_index;
+
+                if (m_bPacketsCmt)
+                {	
+
+                    m_lockGetPacketsCmt.lock();
+                        if (pPkt->time > m_uTrialStartTime)
+                        {
+                            m_bPacketsCmt = FALSE;
+                            m_waitPacketsCmt.wakeAll();
+                        }						
+                    m_lockGetPacketsCmt.unlock();
+                }
+            }
+        }
+        m_lockTrialComment.unlock();
+    }
+}
+
+// Author & Date:   Hyrum L. Sessions   10 June 2016
+/** Called when a comment packet comes in.
+*
+* @param[in] pPkt the log packet
+*/
+void SdkApp::OnPktLog(const cbPKT_LOG * const pPkt)
+{
+    if (m_CMT && m_bWithinTrial)
+    {
+        m_lockTrialComment.lock();
+        // double check if buffer is still valid
+        if (m_CMT)
+        {
+            // Add a sample...
+            // If there's room for more data...
+            UINT32 new_write_index = m_CMT->write_index + 1;
+            if (new_write_index >= m_CMT->size)
+                new_write_index = 0;
+
+            if (new_write_index != m_CMT->write_start_index)
+            {
+                UINT32 write_index = m_CMT->write_index;
+                // Store more data
+                m_CMT->charset[write_index]  = 0;   // force to ANSI charset
+                m_CMT->rgba[write_index]  = 0xFFFFFFFF;
+                m_CMT->timestamps[write_index] = pPkt->time;
+
+                strncpy((char *)m_CMT->comments[write_index], (const char *)(&pPkt->desc[0]), cbMAX_LOG);
+                m_CMT->write_index = new_write_index;
+
+                if (m_bPacketsCmt)
+                {	
+
+                    m_lockGetPacketsCmt.lock();
+                        if (pPkt->time > m_uTrialStartTime)
+                        {
+                            m_bPacketsCmt = FALSE;
+                            m_waitPacketsCmt.wakeAll();
+                        }						
+                    m_lockGetPacketsCmt.unlock();
+                }
             }
         }
         m_lockTrialComment.unlock();
@@ -273,10 +341,12 @@ void SdkApp::OnPktComment(const cbPKT_COMMENT * const pPkt)
 }
 
 // Author & Date:   Ehsan Azar     27 Oct 2011
-// Purpose: Called when a video tracking packet comes in.
-//           and fills tracking global cache considering the last synchronization packet
-// Inputs:
-//  pPkt - the video tracking packet
+/** Called when a video tracking packet comes in.
+*
+* Fills tracking global cache considering the last synchronization packet.
+*
+* @param[in] pPkt the video packet
+*/
 void SdkApp::OnPktTrack(const cbPKT_VIDEOTRACK * const pPkt)
 {
     if (m_TR && m_bWithinTrial && m_lastPktVideoSynch.chid == cbPKTCHAN_CONFIGURATION)
@@ -341,12 +411,26 @@ void SdkApp::OnPktTrack(const cbPKT_VIDEOTRACK * const pPkt)
                     if (pointCount > cbMAX_TRACKCOORDS / 2)
                         pointCount = cbMAX_TRACKCOORDS / 2;
                     memcpy(m_TR->coords[id][write_index], pPkt->sizes, pointCount * sizeof(UINT32));
-                } else {
+                }
+                else
+                {
                     if (pointCount > cbMAX_TRACKCOORDS)
                         pointCount = cbMAX_TRACKCOORDS;
                     memcpy(m_TR->coords[id][write_index], pPkt->coords, pointCount * sizeof(UINT16));
                 }
                 m_TR->write_index[id] = new_write_index;
+
+                if (m_bPacketsTrack)
+                {	
+
+                    m_lockGetPacketsTrack.lock();
+                        if (pPkt->time > m_uTrialStartTime)
+                        {
+                            m_bPacketsTrack = FALSE;
+                            m_waitPacketsTrack.wakeAll();
+                        }						
+                    m_lockGetPacketsTrack.unlock();
+                }
             }
         }
         m_lockTrialTracking.unlock();
@@ -354,10 +438,12 @@ void SdkApp::OnPktTrack(const cbPKT_VIDEOTRACK * const pPkt)
 }
 
 // Author & Date:   Ehsan Azar     16 May 2012
-// Purpose: Late binding of callback function when needed
-//           Make sure this is called before any callback invokation
-// Inputs:
-//   callbacktype  - the calback type to bind
+/** Late binding of callback function when needed.
+*
+* Make sure this is called before any callback invokation.
+*
+* @param[in] callbacktype the calback type to bind
+*/
 void SdkApp::LateBindCallback(cbSdkCallbackType callbacktype)
 {
     if (m_pCallback[callbacktype] != m_pLateCallback[callbacktype])
@@ -371,8 +457,9 @@ void SdkApp::LateBindCallback(cbSdkCallbackType callbacktype)
 
 /////////////////////////////////////////////////////////////////////////////
 // Author & Date:   Ehsan Azar     29 March 2011
-// Purpose: Signal packet-lost event
-//           Only the first registered callback receives packet lost events
+/** Signal packet-lost event.
+* Only the first registered callback receives packet lost events.
+*/
 void SdkApp::LinkFailureEvent(cbSdkPktLostEvent & lost)
 {
     m_lastLost = lost;
@@ -397,7 +484,10 @@ void SdkApp::LinkFailureEvent(cbSdkPktLostEvent & lost)
 
 /////////////////////////////////////////////////////////////////////////////
 // Author & Date:   Ehsan Azar     29 April 2012
-// Purpose: Signal instrument information event
+
+/** Signal instrument information event.
+*
+*/
 void SdkApp::InstInfoEvent(UINT32 instInfo)
 {
     m_lastInstInfo.instInfo = instInfo;
@@ -415,19 +505,22 @@ void SdkApp::InstInfoEvent(UINT32 instInfo)
 /////////////////////////////////////////////////////////////////////////////
 
 // Author & Date:   Ehsan Azar     23 Feb 2011
-// Purpose: Get cbsdk version information
-//           if library is closed only the library version is returned and warns
-//           if library is open NSP versin is returned too
-// Outputs:
-//   version - the pointer to get library version
-//   returns the error code
+/** Get cbsdk version information.
+*
+* If library is closed only the library version is returned and warns.
+* If library is open NSP versin is returned too.
+*
+* @param[out] version the pointer to get library version
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetVersion(cbSdkVersion *version)
 {
     memset(version, 0, sizeof(cbSdkVersion));
     version->major = BMI_VERSION_MAJOR;
     version->minor = BMI_VERSION_MINOR;
-    version->release = BMI_VERSION_RELEASE;
-    version->beta = BMI_VERSION_BETA;
+    version->release = BMI_VERSION_REVISION;
+    version->beta = BMI_VERSION_BUILD;
     version->majorp = cbVERSION_MAJOR;
     version->minorp = cbVERSION_MINOR;
     if (m_instInfo == 0)
@@ -445,7 +538,8 @@ cbSdkResult SdkApp::SdkGetVersion(cbSdkVersion *version)
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetVersion
+
+/// sdk stub for SdkApp::SdkGetVersion.
 CBSDKAPI    cbSdkResult cbSdkGetVersion(UINT32 nInstance, cbSdkVersion *version)
 {
     if (nInstance >= cbMAXOPEN)
@@ -455,8 +549,8 @@ CBSDKAPI    cbSdkResult cbSdkGetVersion(UINT32 nInstance, cbSdkVersion *version)
     memset(version, 0, sizeof(cbSdkVersion));
     version->major = BMI_VERSION_MAJOR;
     version->minor = BMI_VERSION_MINOR;
-    version->release = BMI_VERSION_RELEASE;
-    version->beta = BMI_VERSION_BETA;
+    version->release = BMI_VERSION_REVISION;
+    version->beta = BMI_VERSION_BUILD;
     version->majorp = cbVERSION_MAJOR;
     version->minorp = cbVERSION_MINOR;
     if (g_app[nInstance] == NULL)
@@ -466,9 +560,7 @@ CBSDKAPI    cbSdkResult cbSdkGetVersion(UINT32 nInstance, cbSdkVersion *version)
 }
 
 // Author & Date:   Ehsan Azar     12 April 2012
-// Purpose: CCF error to CBSDK error
-// Outputs:
-//   pData    - the pointer to get CCF structure
+/// CCF error to CBSDK error.
 cbSdkResult cbSdkErrorFromCCFError(ccf::ccfResult err)
 {
     cbSdkResult res = CBSDKRESULT_UNKNOWN;
@@ -496,8 +588,10 @@ cbSdkResult cbSdkErrorFromCCFError(ccf::ccfResult err)
 }
 
 // Author & Date:   Ehsan Azar     10 June 2012
-// Purpose: CCF callback function
-//           this is the intermediate function that passes the result to registered callback
+/** CCF callback function.
+*
+* This is the intermediate function that passes the result to registered callback.
+*/
 void SdkApp::SdkAsynchCCF(const ccf::ccfResult res, LPCSTR szFileName, const cbStateCCF state, const UINT32 nProgress)
 {
     cbSdkCCFEvent ev;
@@ -514,7 +608,7 @@ void SdkApp::SdkAsynchCCF(const ccf::ccfResult res, LPCSTR szFileName, const cbS
         m_pLateCallback[CBSDKCALLBACK_CCF](m_nInstance, cbSdkPkt_CCF, &ev, m_pLateCallbackParams[CBSDKCALLBACK_CCF]);;
 }
 
-// Purpose: sdk stub for SdkApp::SdkAsynchCCF
+/// sdk stub for SdkApp::SdkAsynchCCF
 void cbSdkAsynchCCF(UINT32 nInstance, const ccf::ccfResult res, LPCSTR szFileName, const cbStateCCF state, const UINT32 nProgress)
 {
     if (nInstance >= cbMAXOPEN)
@@ -525,21 +619,23 @@ void cbSdkAsynchCCF(UINT32 nInstance, const ccf::ccfResult res, LPCSTR szFileNam
 }
 
 // Author & Date:   Ehsan Azar     12 April 2012
-// Purpose: Get CCF configuration information from file or NSP
-//           if filename is specified then library can be closed, but warning is returned
-//           if library is open and filename is NULL reads from NSP
-//           Note: progress callback if required should be registered beforehand
-//           Note: for threaded read make sure the provided cbSdkCCF variable lifespan covers the thread context
-// Inputs:
-//   szFileName  - CCF filename to read (or NULL to read from NSP)
-//   bConvert    - If conversion is allowed
-//   bSend       - if should send CCF after successful read
-//   bThreaded   - if a thread should do the task
-// Outputs:
-//   pData         - the pointer to get CCF structure
-//   pData->data   - CCF data will be copied here
-//   pData->ccfver - the internal version of the original data
-//   returns the error code
+/** Get CCF configuration information from file or NSP.
+*
+* If filename is specified then library can be closed, but warning is returned.
+* If library is open and filename is NULL reads from NSP.
+* Note: progress callback if required should be registered beforehand.
+* Note: for threaded read make sure the provided cbSdkCCF variable lifespan covers the thread context.
+*
+* @param[in] szFileName		CCF filename to read (or NULL to read from NSP)
+* @param[in] bConvert		If conversion is allowed
+* @param[in] bSend			If should send CCF after successful read
+* @param[in] bThreaded		If a thread should do the task
+* @param[out] pData			The pointer to get CCF structure
+* @param[out] pData->data	CCF data will be copied here
+* @param[out] pData->ccfver the internal version of the original data
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkReadCCF(cbSdkCCF * pData, const char * szFileName, bool bConvert, bool bSend, bool bThreaded)
 {
     memset(&pData->data, 0, sizeof(pData->data));
@@ -560,7 +656,7 @@ cbSdkResult SdkApp::SdkReadCCF(cbSdkCCF * pData, const char * szFileName, bool b
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetVersion
+/// sdk stub for SdkApp::SdkGetVersion
 CBSDKAPI    cbSdkResult cbSdkReadCCF(UINT32 nInstance, cbSdkCCF * pData, const char * szFileName, bool bConvert, bool bSend, bool bThreaded)
 {
     if (pData == NULL)
@@ -575,18 +671,20 @@ CBSDKAPI    cbSdkResult cbSdkReadCCF(UINT32 nInstance, cbSdkCCF * pData, const c
 }
 
 // Author & Date:   Ehsan Azar     12 April 2012
-// Purpose: Write CCF configuration information to file or send to NSP
-//           If filename is specified CCF is written, if library is closed it warns
-//           if library is open and filename is NULL sends CCF to NSP
-//           Note: progress callback if required should be registered beforehand
-// Inputs:
-//   pData         - the pointer to get CCF structure
-//   pData->data   - CCF data to use
-//   szFileName    - CCF filename to write to (or NULL to send to NSP)
-//   bThreaded     - if a thread should do the task
-// Outputs:
-//   pData->ccfver - last internal version used
-//   returns the error code
+/** Write CCF configuration information to file or send to NSP.
+*
+* If filename is specified CCF is written, if library is closed it warns
+* If library is open and filename is NULL sends CCF to NSP
+* Note: progress callback if required should be registered beforehand
+*
+* @param[in] pData			The pointer to get CCF structure
+* @param[in] pData->data	CCF data to use
+* @param[in] szFileName		CCF filename to write to (or NULL to send to NSP)
+* @param[in] bThreaded		If a thread should do the task
+* @param[out] pData->ccfver Last internal version used
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkWriteCCF(cbSdkCCF * pData, const char * szFileName, bool bThreaded)
 {
     pData->ccfver = 0;
@@ -611,14 +709,14 @@ cbSdkResult SdkApp::SdkWriteCCF(cbSdkCCF * pData, const char * szFileName, bool 
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkWriteCCF
+/// sdk stub for SdkApp::SdkWriteCCF
 CBSDKAPI    cbSdkResult cbSdkWriteCCF(UINT32 nInstance, cbSdkCCF * pData, const char * szFileName, bool bThreaded)
 {
     if (pData == NULL)
         return CBSDKRESULT_NULLPTR;
     if (nInstance >= cbMAXOPEN)
         return CBSDKRESULT_INVALIDPARAM;
-    // TODO: make it possible to convert even with library closed
+    /// \todo make it possible to convert even with library closed
     if (g_app[nInstance] == NULL)
         return CBSDKRESULT_CLOSED;
 
@@ -626,13 +724,14 @@ CBSDKAPI    cbSdkResult cbSdkWriteCCF(UINT32 nInstance, cbSdkCCF * pData, const 
 }
 
 // Author & Date:   Ehsan Azar     23 Feb 2011
-// Purpose: open cbsdk library
-// Inputs:
-//  conType - the requested connection type to open
-//  id      - instance ID
-//  con     - connection details
-// Outputs:
-//   returns the error code
+/** Open cbsdk library.
+*
+* @param[in] conType		The requested connection type to open
+* @param[in] id				Instance ID
+* @param[in] con			Connection details
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkOpen(UINT32 nInstance, cbSdkConnectionType conType, cbSdkConnection con)
 {
     // check if the library is already open
@@ -713,7 +812,7 @@ cbSdkResult SdkApp::SdkOpen(UINT32 nInstance, cbSdkConnectionType conType, cbSdk
     m_uTrialStartTime = 0;
 
     // If this is not part of another Qt application, and the-only Qt app intance is not present
-    if (QCoreApplication::instance() == NULL && QAppPriv::pApp == NULL)
+    if (QCoreApplication::instance() == NULL)
         QAppPriv::pApp = new QCoreApplication(QAppPriv::argc, QAppPriv::argv);
 
     if (conType == CBSDKCONNECTION_UDP)
@@ -791,7 +890,7 @@ cbSdkResult SdkApp::SdkOpen(UINT32 nInstance, cbSdkConnectionType conType, cbSdk
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkOpen
+/// sdk stub for SdkApp::SdkOpen
 CBSDKAPI    cbSdkResult cbSdkOpen(UINT32 nInstance, cbSdkConnectionType conType, cbSdkConnection con)
 {
     // check if the library is already open
@@ -814,9 +913,10 @@ CBSDKAPI    cbSdkResult cbSdkOpen(UINT32 nInstance, cbSdkConnectionType conType,
 }
 
 // Author & Date:   Ehsan Azar     24 Feb 2011
-// Purpose: Close cbsdk library
-// Outputs:
-//   returns the error code
+/** Close cbsdk library.
+*
+* \nThis function returns the error code
+*/
 cbSdkResult SdkApp::SdkClose()
 {
     cbSdkResult res = CBSDKRESULT_SUCCESS;
@@ -854,7 +954,7 @@ cbSdkResult SdkApp::SdkClose()
     return res;
 }
 
-// Purpose: sdk stub for SdkApp::SdkClose
+/// sdk stub for SdkApp::SdkClose
 CBSDKAPI    cbSdkResult cbSdkClose(UINT32 nInstance)
 {
     if (nInstance >= cbMAXOPEN)
@@ -868,7 +968,7 @@ CBSDKAPI    cbSdkResult cbSdkClose(UINT32 nInstance)
     delete g_app[nInstance];
     g_app[nInstance] = NULL;
 
-    // TODO: see if this is necessary and useful before removing
+    /// \todo see if this is necessary and useful before removing
 #if 0
     // Close application if this is the last
     if (QAppPriv::pApp)
@@ -894,11 +994,13 @@ CBSDKAPI    cbSdkResult cbSdkClose(UINT32 nInstance)
 }
 
 // Author & Date:   Ehsan Azar     24 Feb 2011
-// Purpose: Get cbsdk connection and instrument type
-// Outputs:
-//   conType  - the actual connection type
-//   instType - the instrument type
-//   returns the error code
+/** Get cbsdk connection and instrument type.
+*
+* @param[out] conType	The actual connection type
+* @param[out] instType	The instrument type
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetType(cbSdkConnectionType * conType, cbSdkInstrumentType * instType)
 {
     if (m_instInfo == 0)
@@ -915,7 +1017,9 @@ cbSdkResult SdkApp::SdkGetType(cbSdkConnectionType * conType, cbSdkInstrumentTyp
                 *instType = CBSDKINSTRUMENT_NPLAY;
             else
                 *instType = CBSDKINSTRUMENT_REMOTENPLAY;
-        } else {
+        }
+        else
+        {
             if (instInfo & cbINSTINFO_LOCAL)
                 *instType = CBSDKINSTRUMENT_LOCALNSP;
             else
@@ -935,7 +1039,7 @@ cbSdkResult SdkApp::SdkGetType(cbSdkConnectionType * conType, cbSdkInstrumentTyp
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetType
+/// sdk stub for SdkApp::SdkGetType
 CBSDKAPI    cbSdkResult cbSdkGetType(UINT32 nInstance, cbSdkConnectionType * conType, cbSdkInstrumentType * instType)
 {
     if (instType == NULL && conType == NULL)
@@ -949,9 +1053,10 @@ CBSDKAPI    cbSdkResult cbSdkGetType(UINT32 nInstance, cbSdkConnectionType * con
 }
 
 // Author & Date:   Ehsan Azar     25 Oct 2011
-// Purpose: Internal lock-less function to deallocate given trial construct
-// Outputs:
-//   returns the error code
+/** Internal lock-less function to deallocate given trial construct.
+*
+* \nThis function returns the error code
+*/
 cbSdkResult SdkApp::unsetTrialConfig(cbSdkTrialType type)
 {
     cbSdkResult res = CBSDKRESULT_SUCCESS;
@@ -960,7 +1065,7 @@ cbSdkResult SdkApp::unsetTrialConfig(cbSdkTrialType type)
     case CBSDKTRIAL_CONTINUOUS:
         if (m_CD == NULL)
             return CBSDKRESULT_ERRCONFIG;
-        for (UINT32 i = 0; i < cbNUM_ANALOG_CHANS; ++i)
+        for (UINT32 i = 0; i < cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans(); ++i)
         {
             if (m_CD->continuous_channel_data[i])
             {
@@ -975,7 +1080,7 @@ cbSdkResult SdkApp::unsetTrialConfig(cbSdkTrialType type)
     case CBSDKTRIAL_EVENTS:
         if (m_ED == NULL)
             return CBSDKRESULT_ERRCONFIG;
-        for (UINT32 i = 0; i < cbNUM_ANALOG_CHANS + 2; ++i)
+        for (UINT32 i = 0; i < cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans() + 2; ++i)
         {
             if (m_ED->timestamps[i])
             {
@@ -1081,9 +1186,10 @@ cbSdkResult SdkApp::unsetTrialConfig(cbSdkTrialType type)
 }
 
 // Author & Date:   Ehsan Azar     25 Oct 2011
-// Purpose: Deallocate given trial construct
-// Outputs:
-//   returns the error code
+/** Deallocate given trial construct.
+*
+* \nThis function returns the error code
+*/
 cbSdkResult SdkApp::SdkUnsetTrialConfig(cbSdkTrialType type)
 {
     cbSdkResult res = CBSDKRESULT_SUCCESS;
@@ -1116,7 +1222,7 @@ cbSdkResult SdkApp::SdkUnsetTrialConfig(cbSdkTrialType type)
     return res;
 }
 
-// Purpose: sdk stub for SdkApp::SdkUnsetTrialConfig
+/// sdk stub for SdkApp::SdkUnsetTrialConfig
 CBSDKAPI    cbSdkResult cbSdkUnsetTrialConfig(UINT32 nInstance, cbSdkTrialType type)
 {
     if (nInstance >= cbMAXOPEN)
@@ -1128,10 +1234,12 @@ CBSDKAPI    cbSdkResult cbSdkUnsetTrialConfig(UINT32 nInstance, cbSdkTrialType t
 }
 
 // Author & Date:   Ehsan Azar     24 Feb 2011
-// Purpose: Get time from instrument
-// Outputs:
-//   cbtime - the clock time of the instrument
-//   returns the error code
+/** Get time from instrument.
+*
+* @param[out] cbtime the clock time of the instrument
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetTime(UINT32 * cbtime)
 {
     if (m_instInfo == 0)
@@ -1144,7 +1252,7 @@ cbSdkResult SdkApp::SdkGetTime(UINT32 * cbtime)
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetTime
+/// sdk stub for SdkApp::SdkGetTime
 CBSDKAPI    cbSdkResult cbSdkGetTime(UINT32 nInstance, UINT32 * cbtime)
 {
     if (cbtime == NULL)
@@ -1158,10 +1266,10 @@ CBSDKAPI    cbSdkResult cbSdkGetTime(UINT32 nInstance, UINT32 * cbtime)
 }
 
 // Author & Date:   Ehsan Azar     29 April 2012
-// Purpose: Get direct access to spike cache shared memory
-// Outputs:
-//   cbtime - the clock time of the instrument
-//   returns the error code
+/** Get direct access to spike cache shared memory.
+*
+* \nThis function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetSpkCache(UINT16 channel, cbSPKCACHE **cache)
 {
     if (m_instInfo == 0)
@@ -1173,7 +1281,7 @@ cbSdkResult SdkApp::SdkGetSpkCache(UINT16 channel, cbSPKCACHE **cache)
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkkGetSpkCache
+/// sdk stub for SdkApp::SdkkGetSpkCache
 CBSDKAPI    cbSdkResult cbSdkGetSpkCache(UINT32 nInstance, UINT16 channel, cbSPKCACHE **cache)
 {
     if (cache == NULL)
@@ -1189,24 +1297,25 @@ CBSDKAPI    cbSdkResult cbSdkGetSpkCache(UINT32 nInstance, UINT16 channel, cbSPK
 }
 
 // Author & Date:   Ehsan Azar     25 June 2012
-// Purpose: Get information about configured data collection trial and its active status
-// Inputs:
-//   pbActive - pointer to get active status
-//   pBegchan - pointer (if non-NULL) to get start channel
-//   pBegmask - pointer (if non-NULL) to get mask for start value
-//   pBegval  - pointer (if non-NULL) to get start value
-//   pEndchan - pointer (if non-NULL) to get last channel
-//   pEndmask - pointer (if non-NULL) to get mask for end value
-//   pEndval  - pointer (if non-NULL) to get end value
-//   pbDouble - pointer (if non-NULL) to get if data array is double precision
-//   puWaveforms - pointer (if non-NULL) to get number of spike waveform to buffer
-//   puConts     - pointer (if non-NULL) to get number of continuous data to buffer
-//   puEvents    - pointer (if non-NULL) to get number of events to buffer
-//   puComments  - pointer (if non-NULL) to get number of comments to buffer
-//   puTrackings - pointer (if non-NULL) to get number of tracking data to buffer
-//   pbAbsolute  - pointer (if non-NULL) to get if timing is absolute
-// Outputs:
-//   Returns the error code
+/** Get information about configured data collection trial and its active status.
+*
+* @param[in,out]	pbActive	pointer to get active status
+* @param[in,out]	pBegchan	pointer (if non-NULL) to get start channel
+* @param[in,out]	pBegmask	pointer (if non-NULL) to get mask for start value
+* @param[in,out]	pBegval		pointer (if non-NULL) to get start value
+* @param[in,out]	pEndchan	pointer (if non-NULL) to get last channel
+* @param[in,out]	pEndmask	pointer (if non-NULL) to get mask for end value
+* @param[in,out]	pEndval		pointer (if non-NULL) to get end value
+* @param[in,out]	pbDouble	pointer (if non-NULL) to get if data array is double precision
+* @param[in,out]	puWaveforms pointer (if non-NULL) to get number of spike waveform to buffer
+* @param[in,out]	puConts     pointer (if non-NULL) to get number of continuous data to buffer
+* @param[in,out]	puEvents    pointer (if non-NULL) to get number of events to buffer
+* @param[in,out]	puComments  pointer (if non-NULL) to get number of comments to buffer
+* @param[in,out]	puTrackings pointer (if non-NULL) to get number of tracking data to buffer
+* @param[in,out]	pbAbsolute  pointer (if non-NULL) to get if timing is absolute
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetTrialConfig(UINT32 * pbActive, UINT16 * pBegchan, UINT32 * pBegmask, UINT32 * pBegval,
                                       UINT16 * pEndchan, UINT32 * pEndmask, UINT32 * pEndval, bool * pbDouble,
                                       UINT32 * puWaveforms, UINT32 * puConts, UINT32 * puEvents,
@@ -1243,7 +1352,7 @@ cbSdkResult SdkApp::SdkGetTrialConfig(UINT32 * pbActive, UINT16 * pBegchan, UINT
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetTrialConfig
+/// sdk stub for SdkApp::SdkGetTrialConfig
 CBSDKAPI    cbSdkResult cbSdkGetTrialConfig(UINT32 nInstance,
                                             UINT32 * pbActive, UINT16 * pBegchan, UINT32 * pBegmask, UINT32 * pBegval,
                                             UINT16 * pEndchan, UINT32 * pEndmask, UINT32 * pEndval, bool * pbDouble,
@@ -1262,24 +1371,25 @@ CBSDKAPI    cbSdkResult cbSdkGetTrialConfig(UINT32 nInstance,
 }
 
 // Author & Date:   Ehsan Azar     25 Feb 2011
-// Purpose: Allocate buffers and start a data collection trial
-// Inputs:
-//   bActive - start if true, stop otherwise
-//   begchan - start channel
-//   begmask - mask for start value
-//   begval  - start value
-//   endchan - last channel
-//   endmask - mask for end value
-//   endval  - end value
-//   bDouble - if data array is double precision
-//   uWaveforms - number of spike waveform to buffer
-//   uConts     - number of continuous data to buffer
-//   uEvents    - number of events to buffer
-//   uComments  - number of comments to buffer
-//   uTrackings - number of tracking data to buffer
-//   bAbsolute  - if event timing is absolute or relative to trial
-// Outputs:
-//   Returns the error code
+/** Allocate buffers and start a data collection trial.
+*
+* @param[in]	bActive		Start if true, stop otherwise
+* @param[in]	begchan		Start channel
+* @param[in]	begmask		Mask for start value
+* @param[in]	begval		Start value
+* @param[in]	endchan		Last channel
+* @param[in]	endmask		Mask for end value
+* @param[in]	endval		End value
+* @param[in]	bDouble		If data array is double precision
+* @param[in]	uWaveforms  Number of spike waveform to buffer
+* @param[in]	uConts      Number of continuous data to buffer
+* @param[in]	uEvents     Number of events to buffer
+* @param[in]	uComments   Number of comments to buffer
+* @param[in]	uTrackings  Number of tracking data to buffer
+* @param[in]	bAbsolute   If event timing is absolute or relative to trial
+
+* \n This function returns the error code.
+*/
 cbSdkResult SdkApp::SdkSetTrialConfig(UINT32 bActive, UINT16 begchan, UINT32 begmask, UINT32 begval,
                                       UINT16 endchan, UINT32 endmask, UINT32 endval, bool bDouble,
                                       UINT32 uWaveforms, UINT32 uConts, UINT32 uEvents, UINT32 uComments, UINT32 uTrackings,
@@ -1314,7 +1424,7 @@ cbSdkResult SdkApp::SdkSetTrialConfig(UINT32 bActive, UINT16 begchan, UINT32 beg
             m_CD->size = uConts;
             bool bErr = false;
             try {
-                for (UINT32 i = 0; i < cbNUM_ANALOG_CHANS; ++i)
+                for (UINT32 i = 0; i < cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans(); ++i)
                 {
                     m_CD->continuous_channel_data[i] = new INT16[m_CD->size];
                     if (m_CD->continuous_channel_data[i] == NULL)
@@ -1351,7 +1461,7 @@ cbSdkResult SdkApp::SdkSetTrialConfig(UINT32 bActive, UINT16 begchan, UINT32 beg
             m_ED->size = uEvents;
             bool bErr = false;
             try {
-                for (UINT32 i = 0; i < cbNUM_ANALOG_CHANS + 2; ++i)
+                for (UINT32 i = 0; i < cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans() + 2; ++i)
                 {
                     m_ED->timestamps[i] = new UINT32[m_ED->size];
                     m_ED->units[i] = new UINT16[m_ED->size];
@@ -1479,7 +1589,7 @@ cbSdkResult SdkApp::SdkSetTrialConfig(UINT32 bActive, UINT16 begchan, UINT32 beg
         {
             if (uWaveforms > m_ED->size)
                 return CBSDKRESULT_ERRMEMORYTRIAL;
-            // TODO: implement using cache
+            /// \todo implement using cache
             return CBSDKRESULT_NOTIMPLEMENTED;
         }
     }
@@ -1490,7 +1600,9 @@ cbSdkResult SdkApp::SdkSetTrialConfig(UINT32 bActive, UINT16 begchan, UINT32 beg
     if (bActive == FALSE)
     {
         m_bWithinTrial = FALSE;
-    } else { // otherwise set the status to true
+    }
+    else
+    { // otherwise set the status to true
         // reset the trial data cache if WithinTrial is currently False
         if (!m_bWithinTrial)
         {
@@ -1538,7 +1650,7 @@ cbSdkResult SdkApp::SdkSetTrialConfig(UINT32 bActive, UINT16 begchan, UINT32 beg
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetTrialConfig
+/// sdk stub for SdkApp::SdkSetTrialConfig
 CBSDKAPI    cbSdkResult cbSdkSetTrialConfig(UINT32 nInstance,
                                             UINT32 bActive, UINT16 begchan, UINT32 begmask, UINT32 begval,
                                             UINT16 endchan, UINT32 endmask, UINT32 endval, bool bDouble,
@@ -1557,15 +1669,14 @@ CBSDKAPI    cbSdkResult cbSdkSetTrialConfig(UINT32 nInstance,
 }
 
 // Author & Date:   Ehsan Azar     25 Feb 2011
-// Purpose: Get channel label for a given channel
-// Inputs:
-//   channel - the channel number (1-based)
-// Outputs:
-//   bValid[6] - spike and Hoops validity (NULL means ignore)
-//   label[cbLEN_STR_LABEL] - channel label
-//   userflags - channel user flag
-//   position[4]  - channel position
-//   returns the error code
+/** Get channel label for a given channel
+*
+* @param[in]	channel					the channel number (1-based)
+* @param[out]	bValid[6]				spike and Hoops validity (NULL means ignore)
+* @param[out]	label[cbLEN_STR_LABEL]  channel label
+* @param[out]	userflags				channel user flag
+* @param[out]	position[4]				channel position
+*/
 cbSdkResult SdkApp::SdkGetChannelLabel(UINT16 channel, UINT32 * bValid, char * label, UINT32 * userflags, INT32 * position)
 {
     if (m_instInfo == 0)
@@ -1580,14 +1691,14 @@ cbSdkResult SdkApp::SdkGetChannelLabel(UINT16 channel, UINT32 * bValid, char * l
         for (int i = 0; i < 6; ++i)
             bValid[i] = 0;
         cbHOOP hoops[cbMAXUNITS][cbMAXHOOPS];
-        if (channel <= cbNUM_ANALOG_CHANS)
+        if (channel <= cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans())
         {
             cbGetAinpSpikeHoops(channel, &hoops[0][0], m_nInstance);
             bValid[0] = IsSpikeProcessingEnabled(channel);
             for (int i = 0; i < cbMAXUNITS; ++i)
                 bValid[i + 1] = hoops[i][0].valid;
         }
-        else if ( (channel == MAX_CHANS_DIGITAL_IN) || (channel == MAX_CHANS_SERIAL) )
+        else if (IsChanDigin(channel) || IsChanSerial(channel))
         {
             UINT32 options;
             cbGetDinpOptions(channel, &options, NULL, m_nInstance);
@@ -1597,7 +1708,7 @@ cbSdkResult SdkApp::SdkGetChannelLabel(UINT16 channel, UINT32 * bValid, char * l
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetChannelLabel
+/// sdk stub for SdkApp::SdkGetChannelLabel
 CBSDKAPI    cbSdkResult cbSdkGetChannelLabel(UINT32 nInstance,
                                              UINT16 channel, UINT32 * bValid, char * label, UINT32 * userflags, INT32 * position)
 {
@@ -1614,14 +1725,16 @@ CBSDKAPI    cbSdkResult cbSdkGetChannelLabel(UINT32 nInstance,
 }
 
 // Author & Date:   Ehsan Azar     21 March 2011
-// Purpose: Set channel label for a given channel
-// Inputs:
-//   channel  - the channel number (1-based)
-//   label    - new channel label
-//   userflags - channel user flag
-//   position - position of the channel (NULL means ignore)
-// Outputs:
-//   returns the error code
+/** Set channel label for a given channel.
+*
+* @param[in]	channel   the channel number (1-based)
+* @param[in]	label     new channel label
+* @param[in]	userflags channel user flag
+* @param[in]	position  position of the channel (NULL means ignore)
+
+* \n This function returns the error code
+*/
+
 cbSdkResult SdkApp::SdkSetChannelLabel(UINT16 channel, const char * label, UINT32 userflags, INT32 * position)
 {
     if (m_instInfo == 0)
@@ -1633,7 +1746,7 @@ cbSdkResult SdkApp::SdkSetChannelLabel(UINT16 channel, const char * label, UINT3
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetChannelLabel
+/// sdk stub for SdkApp::SdkSetChannelLabel
 CBSDKAPI    cbSdkResult cbSdkSetChannelLabel(UINT32 nInstance,
                                              UINT16 channel, const char * label, UINT32 userflags, INT32 * position)
 {
@@ -1650,61 +1763,55 @@ CBSDKAPI    cbSdkResult cbSdkSetChannelLabel(UINT32 nInstance,
 }
 
 // Author & Date:   Ehsan Azar     11 March 2011
-// Purpose: Retrieve data of a configured trial.
-// Inputs:
-//   bActive - if should reset buffer
-//   trialevent->num_samples  - requested number of event samples
-//   trialcont->num_samples   - requested number of continuous samples
-//   trialcomment->num_samples   - requested number of comment samples
-//   trialtracking->num_samples      - requested number of tracking samples
-// Outputs: (buffers must be preallocated at least for requested num_samples of appropriate size)
-//   trialevent->num_samples  - retrieved number of events
-//   trialevent->timestamps   - timestamps for events
-//   trialevent->waveforms    - waveform or digital data
-//   trialcont->num_samples   - retrieved number of continuous samples
-//   trialcont->time          - start time for retrieved continuous samples
-//   trialcont->samples       - continuous samples
-//   trialcomment->num_samples   - retrieved number of comments samples
-//   trialcomment->timestamps    - timestamps for comments
-//   trialcomment->rgbas         - rgba for comments
-//   trialcomment->charsets      - character set for comments
-//   trialcomment->comments      - pointer to the comments
-//   trialtracking->num_samples     - retrieved number of tracking samples
-//   trialtracking->synch_frame_numbers   - retrieved frame numbers
-//   trialtracking->synch_timestamps      - retrieved synchronized timesamps
-//   trialtracking->timestamps      - timestamps for tracking
-//   trialtracking->coords          - tracking coordinates
-//   Returns the error code
+/** Retrieve data of a configured trial.
+*
+* @param[in]	bActive						if should reset buffer
+* @param[in]	trialevent->num_samples		requested number of event samples
+* @param[in]	trialcont->num_samples		requested number of continuous samples
+* @param[in]	trialcomment->num_samples	requested number of comment samples
+* @param[in]	trialtracking->num_samples  requested number of tracking samples
+* @param[out]	trialevent->num_samples		retrieved number of events
+* @param[out]	trialevent->timestamps		timestamps for events
+* @param[out]	trialevent->waveforms		waveform or digital data
+* @param[out]	trialcont->num_samples		retrieved number of continuous samples
+* @param[out]	trialcont->time				start time for retrieved continuous samples
+* @param[out]	trialcont->samples			continuous samples
+* @param[out]	trialcomment->num_samples	retrieved number of comments samples
+* @param[out]	trialcomment->timestamps    timestamps for comments
+* @param[out]	trialcomment->rgbas         rgba for comments
+* @param[out]	trialcomment->charsets      character set for comments
+* @param[out]	trialcomment->comments      pointer to the comments
+* @param[out]	trialtracking->num_samples  retrieved number of tracking samples
+* @param[out]	trialtracking->synch_frame_numbers   retrieved frame numbers
+* @param[out]	trialtracking->synch_timestamps      retrieved synchronized timesamps
+* @param[out]	trialtracking->timestamps      timestamps for tracking
+* @param[out]	trialtracking->coords          tracking coordinates
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetTrialData(UINT32 bActive, cbSdkTrialEvent * trialevent, cbSdkTrialCont * trialcont,
                                       cbSdkTrialComment * trialcomment, cbSdkTrialTracking * trialtracking)
 {
     if (m_instInfo == 0)
         return CBSDKRESULT_CLOSED;
 
-    // This time is used for relative timings,
-    //  continuous as well as event relative timings reset any time bActive is set
-    UINT32 prevStartTime = m_uTrialStartTime;
-    if (bActive)
-        cbGetSystemClockTime(&m_uTrialStartTime, m_nInstance);
+
+    UINT32 prevStartTime = m_uPrevTrialStartTime;
 
     if (trialcont)
     {
-        UINT32 read_end_index[cbNUM_ANALOG_CHANS];
         UINT32 read_start_index[cbNUM_ANALOG_CHANS];
         if (m_CD == NULL)
             return CBSDKRESULT_ERRCONFIG;
         trialcont->time = prevStartTime;
         // Take a snashot
         memcpy(read_start_index, m_CD->write_start_index, sizeof(read_start_index));
-        m_lockTrial.lock();
-        memcpy(read_end_index, m_CD->write_index, sizeof(read_end_index));
-        m_lockTrial.unlock();
 
         // copy the data from the "cache" to the allocated memory.
         for (UINT32 channel = 0; channel < trialcont->count; channel++)
         {
             UINT16 ch = trialcont->chan[channel]; // channel number (index + 1 in cache)
-            if (ch == 0 || ch > cbNUM_ANALOG_CHANS)
+            if (ch == 0 || ch > cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans())
                 return CBSDKRESULT_INVALIDCHANNEL;
             // Ignore masked channels
             if (!m_bChannelMask[ch - 1])
@@ -1714,7 +1821,7 @@ cbSdkResult SdkApp::SdkGetTrialData(UINT32 bActive, cbSdkTrialEvent * trialevent
             }
 
             UINT32 read_index = m_CD->write_start_index[ch - 1];
-            int num_samples = read_end_index[ch - 1] - read_index;
+            int num_samples = m_CD->read_end_index[ch - 1] - read_index;
             if (num_samples < 0)
                 num_samples += m_CD->size;
             // See which one finishes first
@@ -1766,11 +1873,11 @@ cbSdkResult SdkApp::SdkGetTrialData(UINT32 bActive, cbSdkTrialEvent * trialevent
         for (UINT32 channel = 0; channel < trialevent->count; channel++)
         {
             UINT16 ch = trialevent->chan[channel]; // channel number
-            if (ch == MAX_CHANS_DIGITAL_IN)
-                ch = cbNUM_ANALOG_CHANS + 1; //index + 1 in cache
-            else if (ch == MAX_CHANS_SERIAL)
-                ch = cbNUM_ANALOG_CHANS + 2; //index + 1 in cache
-            if (ch == 0 || (ch > cbNUM_ANALOG_CHANS + 2))
+            if (IsChanDigin(ch))
+                ch = cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans() + 1; //index + 1 in cache
+            else if (IsChanSerial(ch))
+                ch = cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans() + 2; //index + 2 in cache
+            if (ch == 0 || (ch > cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans() + 2))
                 return CBSDKRESULT_INVALIDCHANNEL;
             // Ignore masked channels
             if (!m_bChannelMask[trialevent->chan[channel] - 1])
@@ -1790,8 +1897,9 @@ cbSdkResult SdkApp::SdkGetTrialData(UINT32 bActive, cbSdkTrialEvent * trialevent
             for (int i = 0; i < num_samples; ++i)
             {
                 UINT16 unit = m_ED->units[ch - 1][read_index];
+
                 // Digital or serial data
-                if (ch > cbNUM_ANALOG_CHANS)
+                if (ch > cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans())
                 {
                     if (num_samples_unit[0] < trialevent->num_samples[channel][0])
                     {
@@ -1808,7 +1916,7 @@ cbSdkResult SdkApp::SdkGetTrialData(UINT32 bActive, cbSdkTrialEvent * trialevent
                     unit = 0;
                 }
                 // Timestamps
-                if (num_samples_unit[unit] < trialevent->num_samples[channel][unit])
+                if ((unit <= cbMAXUNITS + 1) && (num_samples_unit[unit] < trialevent->num_samples[channel][unit]))
                 {
                     void * dataptr = trialevent->timestamps[channel][unit];
                     // Null means ignore
@@ -1824,8 +1932,7 @@ cbSdkResult SdkApp::SdkGetTrialData(UINT32 bActive, cbSdkTrialEvent * trialevent
                             *((UINT32 *)dataptr + num_samples_unit[unit]) = ts;
                     }
                     num_samples_unit[unit]++;
-                } else
-                    break;
+                } 
 
                 read_index++;
                 if (read_index >= m_ED->size)
@@ -1987,7 +2094,9 @@ cbSdkResult SdkApp::SdkGetTrialData(UINT32 bActive, cbSdkTrialEvent * trialevent
                             UINT32 * dataptr = (UINT32 *) trialtracking->coords[id][i];
                             if (dataptr)
                                 memcpy(dataptr, m_TR->coords[id][read_index], pointCount * dim_count * sizeof(UINT32));
-                        } else {
+                        }
+                        else
+                        {
                             UINT16 * dataptr = (UINT16 *) trialtracking->coords[id][i];
                             if (dataptr)
                                 memcpy(dataptr, m_TR->coords[id][read_index], pointCount * dim_count * sizeof(UINT16));
@@ -2014,7 +2123,7 @@ cbSdkResult SdkApp::SdkGetTrialData(UINT32 bActive, cbSdkTrialEvent * trialevent
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetTrialData
+/// sdk stub for SdkApp::SdkGetTrialData
 CBSDKAPI    cbSdkResult cbSdkGetTrialData(UINT32 nInstance,
                                           UINT32 bActive, cbSdkTrialEvent * trialevent, cbSdkTrialCont * trialcont,
                                           cbSdkTrialComment * trialcomment, cbSdkTrialTracking * trialtracking)
@@ -2028,22 +2137,30 @@ CBSDKAPI    cbSdkResult cbSdkGetTrialData(UINT32 nInstance,
 }
 
 // Author & Date:   Ehsan Azar     22 March 2011
-// Purpose: Initialize the structures
-//           zero all the buffers
-//           fill the current number of samples
-//           can be called before data retrieval (cbSdkGetTrialData) to fill with latest number of samples.
-//           Note: No allocation is performed here,
-//                  Buffer pointers must be set to appropriate allocated buffers after a call to this function
-// Outputs:
-//   trialevent    - initialize channel count, channels, and number of buffered samples for each channel
-//   trialcont     - initialize channel count, channels, sample rate and number of buffered samples for each channel
-//   trialcomment  - initialize number of buffered comments
-//   trialtracking - initialize trackable count, trackable name, id, type,
-//                    mximum point count and number of buffered samples for each trackable
-//   returns the error code
-cbSdkResult SdkApp::SdkInitTrialData(cbSdkTrialEvent * trialevent, cbSdkTrialCont * trialcont,
+/** Initialize the structures.
+*
+* Zero all the buffers.
+* Fill the current number of samples.
+* It can be called before data retrieval (cbSdkGetTrialData) to fill with latest number of samples.
+* Note: No allocation is performed here, buffer pointers must be set to appropriate allocated buffers after a call to this function
+*
+* @param[out]	trialevent    - initialize channel count, channels, and number of buffered samples for each channel
+* @param[out]	trialcont     - initialize channel count, channels, sample rate and number of buffered samples for each channel
+* @param[out]	trialcomment  - initialize number of buffered comments
+* @param[out]	trialtracking - initialize trackable count, trackable name, id, type,
+* maximum point count and number of buffered samples for each trackable
+
+* \n This function returns the error code
+*/
+cbSdkResult SdkApp::SdkInitTrialData(UINT32 bActive, cbSdkTrialEvent * trialevent, cbSdkTrialCont * trialcont,
                                      cbSdkTrialComment * trialcomment, cbSdkTrialTracking * trialtracking)
 {
+    // This time is used for relative timings,
+    //  continuous as well as event relative timings reset any time bActive is set
+    m_uPrevTrialStartTime = m_uTrialStartTime;
+    if (bActive)
+        cbGetSystemClockTime(&m_uTrialStartTime, m_nInstance);
+
     if (trialevent)
     {
         trialevent->count = 0;
@@ -2052,16 +2169,23 @@ cbSdkResult SdkApp::SdkInitTrialData(cbSdkTrialEvent * trialevent, cbSdkTrialCon
         {
             memset(trialevent->chan, 0, sizeof(trialevent->chan));
             return CBSDKRESULT_WARNCLOSED;
-        } else {
+        }
+        else
+        {
             if (m_ED == NULL)
                 return CBSDKRESULT_ERRCONFIG;
+            // Wait for packets to come in
+            m_lockGetPacketsEvent.lock();
+            m_bPacketsEvent = TRUE;
+            m_lockGetPacketsEvent.unlock();
+
             UINT32 read_end_index[cbNUM_ANALOG_CHANS + 2];
             // Take a snapshot of the current write pointer
             m_lockTrialEvent.lock();
             memcpy(read_end_index, m_ED->write_index, sizeof(read_end_index));
             m_lockTrialEvent.unlock();
             int count = 0;
-            for (UINT32 channel = 0; channel < cbNUM_ANALOG_CHANS + 2; channel++)
+            for (UINT32 channel = 0; channel < cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans() + 2; channel++)
             {
                 UINT32 i = m_ED->write_start_index[channel];
                 int num_samples = read_end_index[channel] - i;
@@ -2070,8 +2194,8 @@ cbSdkResult SdkApp::SdkInitTrialData(cbSdkTrialEvent * trialevent, cbSdkTrialCon
                 if (num_samples == 0)
                     continue;
                 UINT16 ch = channel + 1; // Actual channel number
-                if (ch > cbNUM_ANALOG_CHANS)
-                    ch = (ch - cbNUM_ANALOG_CHANS + 150);
+                if (ch > cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans())     //hls
+                    ch = (ch + cb_pc_status_buffer_ptr[0]->cbGetNumAoutChans() + cb_pc_status_buffer_ptr[0]->cbGetNumAudioChans());
                 if (!m_bChannelMask[ch - 1])
                     continue;
                 trialevent->chan[count] = ch;
@@ -2079,7 +2203,7 @@ cbSdkResult SdkApp::SdkInitTrialData(cbSdkTrialEvent * trialevent, cbSdkTrialCon
                 while (i != read_end_index[channel])
                 {
                     UINT16 unit = m_ED->units[channel][i];
-                    if (unit > cbMAXUNITS || channel >= cbNUM_ANALOG_CHANS)
+                    if (unit > cbMAXUNITS || channel >= cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans())
                         unit = 0;
                     trialevent->num_samples[count][unit]++;
                     if (++i >= m_ED->size)
@@ -2099,19 +2223,22 @@ cbSdkResult SdkApp::SdkInitTrialData(cbSdkTrialEvent * trialevent, cbSdkTrialCon
             memset(trialcont->chan, 0, sizeof(trialcont->chan));
             memset(trialcont->sample_rates, 0, sizeof(trialcont->samples));
             return CBSDKRESULT_WARNCLOSED;
-        } else {
+        }
+        else
+        {
             if (m_CD == NULL)
                 return CBSDKRESULT_ERRCONFIG;
-            UINT32 read_end_index[cbNUM_ANALOG_CHANS];
+//            UINT32 read_end_index[cbNUM_ANALOG_CHANS];
             // Take a snapshot of the current write pointer
             m_lockTrial.lock();
-            memcpy(read_end_index, m_CD->write_index, sizeof(read_end_index));
+            memcpy(m_CD->read_end_index, m_CD->write_index, sizeof(m_CD->read_end_index));
             m_lockTrial.unlock();
             int count = 0;
-            for (UINT32 channel = 0; channel < cbNUM_ANALOG_CHANS; channel++)
+            for (UINT32 channel = 0; channel < cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans(); channel++)
             {
-                int num_samples = read_end_index[channel] - m_CD->write_start_index[channel];
-                if (num_samples < 0)
+                int num_samples = m_CD->read_end_index[channel] - m_CD->write_start_index[channel];
+                if (m_CD->read_end_index[channel] < m_CD->write_start_index[channel])
+//                if (num_samples < 0)
                     num_samples += m_CD->size;
                 if (num_samples && m_bChannelMask[channel])
                 {
@@ -2130,9 +2257,18 @@ cbSdkResult SdkApp::SdkInitTrialData(cbSdkTrialEvent * trialevent, cbSdkTrialCon
         if (m_instInfo == 0)
         {
             return CBSDKRESULT_WARNCLOSED;
-        } else {
+        }
+        else
+        {
             if (m_CMT == NULL)
                 return CBSDKRESULT_ERRCONFIG;
+
+            // Wait for packets to come in
+            m_lockGetPacketsCmt.lock();
+            m_bPacketsCmt = TRUE;
+            m_waitPacketsCmt.wait(&m_lockGetPacketsCmt, 250);		
+            m_lockGetPacketsCmt.unlock();
+
             // Take a snapshot of the current write pointer
             m_lockTrialComment.lock();
             UINT32 read_end_index = m_CMT->write_index;
@@ -2158,10 +2294,19 @@ cbSdkResult SdkApp::SdkInitTrialData(cbSdkTrialEvent * trialevent, cbSdkTrialCon
             memset(trialtracking->types, 0, sizeof(trialtracking->types));
             memset(trialtracking->names, 0, sizeof(trialtracking->names));
             return CBSDKRESULT_WARNCLOSED;
-        } else {
+        }
+        else
+        {
             if (m_TR == NULL)
                 return CBSDKRESULT_ERRCONFIG;
             UINT32 read_end_index[cbMAXTRACKOBJ];
+
+            // Wait for packets to come in
+            m_lockGetPacketsTrack.lock();
+            m_bPacketsTrack = TRUE;
+            m_waitPacketsTrack.wait(&m_lockGetPacketsTrack, 250);		
+            m_lockGetPacketsTrack.unlock();
+
             // Take a snapshot of the current write pointer
             m_lockTrialTracking.lock();
             memcpy(read_end_index, m_TR->write_index, sizeof(read_end_index));
@@ -2189,8 +2334,8 @@ cbSdkResult SdkApp::SdkInitTrialData(cbSdkTrialEvent * trialevent, cbSdkTrialCon
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkInitTrialData
-CBSDKAPI    cbSdkResult cbSdkInitTrialData(UINT32 nInstance,
+/// sdk stub for SdkApp::SdkInitTrialData
+CBSDKAPI    cbSdkResult cbSdkInitTrialData(UINT32 nInstance, UINT32 bActive,
                                            cbSdkTrialEvent * trialevent, cbSdkTrialCont * trialcont,
                                            cbSdkTrialComment * trialcomment, cbSdkTrialTracking * trialtracking)
 {
@@ -2199,18 +2344,19 @@ CBSDKAPI    cbSdkResult cbSdkInitTrialData(UINT32 nInstance,
     if (g_app[nInstance] == NULL)
         return CBSDKRESULT_CLOSED;
 
-    return g_app[nInstance]->SdkInitTrialData(trialevent, trialcont, trialcomment, trialtracking);
+    return g_app[nInstance]->SdkInitTrialData(bActive, trialevent, trialcont, trialcomment, trialtracking);
 }
 
 // Author & Date:   Ehsan Azar     25 Feb 2011
-// Purpose: Start or stop file recording
-// Inputs:
-//   filename - file name string
-//   comment  - comment string
-//   bStart   - start or stop recording
-//   options  - the recording options
-// Outputs:
-//   returns the error code
+/** Start or stop file recording.
+*
+* @param[in]	filename  file name string
+* @param[in]	comment   comment string
+* @param[in]	bStart    start or stop recording
+* @param[in]	options   the recording options
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkSetFileConfig(const char * filename, const char * comment, UINT32 bStart, UINT32 options)
 {
     if (m_instInfo == 0)
@@ -2248,7 +2394,7 @@ cbSdkResult SdkApp::SdkSetFileConfig(const char * filename, const char * comment
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetFileConfig
+/// sdk stub for SdkApp::SdkSetFileConfig
 CBSDKAPI    cbSdkResult cbSdkSetFileConfig(UINT32 nInstance,
                                            const char * filename, const char * comment, UINT32 bStart, UINT32 options)
 {
@@ -2267,12 +2413,14 @@ CBSDKAPI    cbSdkResult cbSdkSetFileConfig(UINT32 nInstance,
 }
 
 // Author & Date:   Ehsan Azar     20 Feb 2013
-// Purpose: Get file recording information
-// Outputs:
-//   filename      - file name being recorded
-//   username      - user name recording the file
-//   pbRecording   - If recordign is in progress (depends on keep-alive mechanism)
-//   returns the error code
+/** Get file recording information.
+*
+* @param[out]	filename      file name being recorded
+* @param[out]	username      user name recording the file
+* @param[out]	pbRecording   If recording is in progress (depends on keep-alive mechanism)
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetFileConfig(char * filename, char * username, bool * pbRecording)
 {
     if (m_instInfo == 0)
@@ -2294,7 +2442,7 @@ cbSdkResult SdkApp::SdkGetFileConfig(char * filename, char * username, bool * pb
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetFileConfig
+/// sdk stub for SdkApp::SdkGetFileConfig
 CBSDKAPI    cbSdkResult cbSdkGetFileConfig(UINT32 nInstance,
                                            char * filename, char * username, bool * pbRecording)
 {
@@ -2309,16 +2457,17 @@ CBSDKAPI    cbSdkResult cbSdkGetFileConfig(UINT32 nInstance,
 }
 
 // Author & Date:   Tom Richins     31 Mar 2011
-// Purpose: Share Patient demographics for recording
-//    Inputs:
-//   ID - patient ID
-//   firstname - patient firstname
-//   lastname - patient lastname
-//   DOBMonth - patient Date of Birth month
-//   DOBDay - patient DOB day
-//   DOBYear - patient DOB year
-// Outputs:
-//   returns the error code
+/** Share Patient demographics for recording.
+*
+* @param[in]	ID - patient ID
+* @param[in]	firstname - patient firstname
+* @param[in]	lastname - patient lastname
+* @param[in]	DOBMonth - patient Date of Birth month
+* @param[in]	DOBDay - patient DOB day
+* @param[in]	DOBYear - patient DOB year
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkSetPatientInfo(const char * ID, const char * firstname, const char * lastname,
                                       UINT32 DOBMonth, UINT32 DOBDay, UINT32 DOBYear)
 {
@@ -2353,7 +2502,7 @@ cbSdkResult SdkApp::SdkSetPatientInfo(const char * ID, const char * firstname, c
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetPatientInfo
+/// sdk stub for SdkApp::SdkSetPatientInfo
 CBSDKAPI    cbSdkResult cbSdkSetPatientInfo(UINT32 nInstance,
                                             const char * ID, const char * firstname, const char * lastname,
                                             UINT32 DOBMonth, UINT32 DOBDay, UINT32 DOBYear)
@@ -2381,8 +2530,10 @@ CBSDKAPI    cbSdkResult cbSdkSetPatientInfo(UINT32 nInstance,
 }
 
 // Author & Date:   Tom Richins     13 Apr 2011
-// Purpose: Initiate autoimpedance through central
-//  returns the error code
+/** Initiate autoimpedance through central.
+*
+* \nThis function returns the error code
+*/
 cbSdkResult SdkApp::SdkInitiateImpedance()
 {
     if (m_instInfo == 0)
@@ -2405,7 +2556,7 @@ cbSdkResult SdkApp::SdkInitiateImpedance()
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkInitiateImpedance
+/// sdk stub for SdkApp::SdkInitiateImpedance
 CBSDKAPI    cbSdkResult cbSdkInitiateImpedance(UINT32 nInstance)
 {
     if (nInstance >= cbMAXOPEN)
@@ -2417,14 +2568,16 @@ CBSDKAPI    cbSdkResult cbSdkInitiateImpedance(UINT32 nInstance)
 }
 
 // Author & Date:   Tom Richins     18 Apr 2011
-// Purpose: Send poll for running applications and request response
-//    Running applications will respond.
-// Inputs:
-//    appname - applicationname (zero ended)
-//    mode    - Poll mode
-//    flags   - Poll flags
-// Outputs:
-//  Returns the error code
+/** Send poll for running applications and request response.
+*
+* Running applications will respond.
+* @param[in]	appname application name (zero ended)
+* @param[in]	mode    Poll mode
+* @param[in]	flags   Poll flags
+
+* \n This function returns the error code
+*
+*/
 cbSdkResult SdkApp::SdkSendPoll(const char* appname, UINT32 mode, UINT32 flags, UINT32 extra)
 {
     if (m_instInfo == 0)
@@ -2457,7 +2610,7 @@ cbSdkResult SdkApp::SdkSendPoll(const char* appname, UINT32 mode, UINT32 flags, 
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSendPoll
+/// sdk stub for SdkApp::SdkSendPoll
 CBSDKAPI    cbSdkResult SdkSendPoll(UINT32 nInstance,
                                     const char* appname, UINT32 mode, UINT32 flags, UINT32 extra)
 {
@@ -2472,13 +2625,14 @@ CBSDKAPI    cbSdkResult SdkSendPoll(UINT32 nInstance,
 }
 
 // Author & Date:   Tom Richins     26 May 2011
-// Purpose: Send packet
-//    this is used by any process that needs to send a packet using cbSdk rather
-//    than directly thru library
-// Inputs:
-//   ppckt - void * packet to send
-// Outputs:
-//  returns the error code
+/** Send packet.
+*
+* This is used by any process that needs to send a packet using cbSdk rather
+* than directly thru the library.
+* @param[in]	ppckt void * packet to send
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkSendPacket(void * ppckt)
 {
     if (m_instInfo == 0)
@@ -2492,7 +2646,7 @@ cbSdkResult SdkApp::SdkSendPacket(void * ppckt)
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSendPacket
+/// sdk stub for SdkApp::SdkSendPacket
 CBSDKAPI    cbSdkResult cbSdkSendPoll(UINT32 nInstance, void * ppckt)
 {
     if (ppckt == NULL)
@@ -2506,13 +2660,14 @@ CBSDKAPI    cbSdkResult cbSdkSendPoll(UINT32 nInstance, void * ppckt)
 }
 
 // Author & Date:   Tom Richins     2 Jun 2011
-// Purpose: Set system runlevel
-// Inputs:
-//   runlevel - cbRUNLEVEL_*
-//   locked   - run nflag
-//   resetque - The channel for the reset to que on
-// Outputs:
-//  returns success or unknow failure
+/** Set system runlevel.
+*
+* @param[in]	runlevel  cbRUNLEVEL_*
+* @param[in]	locked    run nflag
+* @param[in]	resetque  The channel for the reset to que on
+
+* \n This function returns success or unknown failure
+*/
 cbSdkResult SdkApp::SdkSetSystemRunLevel(UINT32 runlevel, UINT32 locked, UINT32 resetque)
 {
     if (m_instInfo == 0)
@@ -2535,7 +2690,7 @@ cbSdkResult SdkApp::SdkSetSystemRunLevel(UINT32 runlevel, UINT32 locked, UINT32 
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetSystemRunLevel
+/// sdk stub for SdkApp::SdkSetSystemRunLevel
 CBSDKAPI    cbSdkResult cbSdkSetSystemRunLevel(UINT32 nInstance, UINT32 runlevel, UINT32 locked, UINT32 resetque)
 {
     if (nInstance >= cbMAXOPEN)
@@ -2546,13 +2701,50 @@ CBSDKAPI    cbSdkResult cbSdkSetSystemRunLevel(UINT32 nInstance, UINT32 runlevel
     return g_app[nInstance]->SdkSetSystemRunLevel(runlevel, locked, resetque);
 }
 
+// Author & Date:   Johnluke Siska     15 May 2014
+/** Wrapper to get the system runlevel information.
+*
+* @param[out]		runlevel  cbRUNLEVEL_*
+* @param[out]		runflags  For instance if the system is locked for recording
+* @param[out]		resetque  The channel for the reset to que on
+
+* \n This function returns success or unknown failure
+*/
+cbSdkResult SdkApp::SdkGetSystemRunLevel(UINT32 * runlevel, UINT32 * runflags, UINT32 * resetque)
+{
+    if (m_instInfo == 0)
+        return CBSDKRESULT_CLOSED;
+    cbRESULT cbres = cbGetSystemRunLevel(runlevel, runflags, resetque, m_nInstance);
+    if (cbres == cbRESULT_NOLIBRARY)
+        return CBSDKRESULT_CLOSED;
+    if (cbres == cbRESULT_HARDWAREOFFLINE)
+        return CBSDKRESULT_ERROFFLINE;
+    if (cbres)
+        return CBSDKRESULT_UNKNOWN;
+    return CBSDKRESULT_SUCCESS;
+}
+
+/// sdk stub for SdkApp::SdkGetSystemRunLevel
+CBSDKAPI    cbSdkResult cbSdkGetSystemRunLevel(UINT32 nInstance, UINT32 * runlevel, UINT32 * runflags, UINT32 * resetque)
+{
+    if (runlevel == NULL && runflags == NULL && resetque == NULL)
+        return CBSDKRESULT_NULLPTR;
+    if (nInstance >= cbMAXOPEN)
+        return CBSDKRESULT_INVALIDPARAM;
+    if (g_app[nInstance] == NULL)
+        return CBSDKRESULT_CLOSED;
+
+    return g_app[nInstance]->SdkGetSystemRunLevel(runlevel, runflags, resetque);
+}
+
 // Author & Date:   Ehsan Azar     25 Feb 2011
-// Purpose: Send a digital output
-// Inputs:
-//   channel    - the channel number (1-based) must be digital output channel
-//   value      - the digital value to send
-// Outputs:
-//   returns the error code
+/** Send a digital output.
+*
+* @param[in]	channel    the channel number (1-based) must be digital output channel
+* @param[in]	value      the digital value to send
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkSetDigitalOutput(UINT16 channel, UINT16 value)
 {
     if (m_instInfo == 0)
@@ -2579,27 +2771,35 @@ cbSdkResult SdkApp::SdkSetDigitalOutput(UINT16 channel, UINT16 value)
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetDigitalOutput
+/// sdk stub for SdkApp::SdkSetDigitalOutput
 CBSDKAPI    cbSdkResult cbSdkSetDigitalOutput(UINT32 nInstance, UINT16 channel, UINT16 value)
 {
-    if (channel < MIN_CHANS_DIGITAL_OUT || channel > MAX_CHANS_DIGITAL_OUT)
+    UINT32 nChan = channel;
+
+    // get the channel number
+    if (!IsChanDigout(channel))
+        nChan = GetDigoutChanNumber(channel);
+
+    // verify we didn't get an invalid channel back
+    if (!IsChanDigout(nChan))
         return CBSDKRESULT_INVALIDCHANNEL; // Not a digital output channel
     if (nInstance >= cbMAXOPEN)
         return CBSDKRESULT_INVALIDPARAM;
     if (g_app[nInstance] == NULL)
         return CBSDKRESULT_CLOSED;
 
-    return g_app[nInstance]->SdkSetDigitalOutput(channel, value);
+    return g_app[nInstance]->SdkSetDigitalOutput(nChan, value);
 }
 
 // Author & Date:   Ehsan Azar     25 Feb 2013
-// Purpose: Send a synch output
-// Inputs:
-//   channel    - the channel number (1-based) must be synch output channel
-//   nFreq      - frequency in mHz (0 means stop the clock)
-//   nRepeats   - number of pulses to generate (0 means forever)
-// Outputs:
-//   returns the error code
+/** Send a synch output.
+*
+* @param[in]	channel    the channel number (1-based) must be synch output channel
+* @param[in]	nFreq      frequency in mHz (0 means stop the clock)
+* @param[in]	nRepeats   number of pulses to generate (0 means forever)
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkSetSynchOutput(UINT16 channel, UINT32 nFreq, UINT32 nRepeats)
 {
     if (m_instInfo == 0)
@@ -2631,7 +2831,7 @@ cbSdkResult SdkApp::SdkSetSynchOutput(UINT16 channel, UINT32 nFreq, UINT32 nRepe
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetSynchOutput
+/// sdk stub for SdkApp::SdkSetSynchOutput
 CBSDKAPI    cbSdkResult cbSdkSetSynchOutput(UINT32 nInstance, UINT16 channel, UINT32 nFreq, UINT32 nRepeats)
 {
     if (nInstance >= cbMAXOPEN)
@@ -2643,19 +2843,20 @@ CBSDKAPI    cbSdkResult cbSdkSetSynchOutput(UINT32 nInstance, UINT16 channel, UI
 }
 
 // Author & Date:   Ehsan Azar     5 May 2013
-// Purpose: Upload a file to NSP
-//          This could be used to even update the firmware itself
-//          Warning:
-//           Be very careful in using this mechanism, 
-//           if system files or firmware is overwritten, factory image is needed
-//          Warning:
-//           must not shutdown NSP or communications in midst of operation
-// Inputs:
-//   szSrc     - path to file to be uploaded to NSP
-//   szDstDir  - destination directory (should not include the file name, nor path ending)
-//   nInstance - library instance number
-// Outputs:
-//   returns the error code
+/** Upload a file to NSP.
+*
+* This could be used to even update the firmware itself
+* Warning:
+* Be very careful in using this mechanism,
+* if system files or firmware is overwritten, factory image is needed
+* Warning:
+* Must not shutdown NSP or communications in midst of operation
+* @param[in]	szSrc      path to file to be uploaded to NSP
+* @param[in]	szDstDir   destination directory (should not include the file name, nor path ending)
+* @param[in]	nInstance  library instance number
+
+* \n This function returns the error code
+*/
 cbSdkResult cbSdkUpload(const char * szSrc, const char * szDstDir, UINT32 nInstance)
 {
     UINT32 runlevel;
@@ -2761,21 +2962,22 @@ cbSdkResult cbSdkUpload(const char * szSrc, const char * szDstDir, UINT32 nInsta
     }
 
     free(pFileData);
-    
+
     if (res == CBSDKRESULT_SUCCESS)
     {
-        // TODO: must wait for cbLOG_MODE_UPLOAD_RES because mount is asynch
+        /// \todo must wait for cbLOG_MODE_UPLOAD_RES because mount is asynch
     }
 
     return res;
 }
 
 // Author & Date:   Ehsan Azar     5 May 2013
-// Purpose: Send an extension command
-// Inputs:
-//   extCmd    - the extension command
-// Outputs:
-//   returns the error code
+/** Send an extension command.
+*
+* @param[in]	extCmd      the extension command
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkExtDoCommand(cbSdkExtCmd * extCmd)
 {
     if (m_instInfo == 0)
@@ -2820,6 +3022,20 @@ cbSdkResult SdkApp::SdkExtDoCommand(cbSdkExtCmd * extCmd)
         if (cbres)
             return CBSDKRESULT_UNKNOWN;
         break;
+    case cbSdkExtCmd_END_PLUGIN:
+        pktLog.mode = cbLOG_MODE_ENDPLUGIN;
+        // send the packet
+        cbres = cbSendPacket(&pktLog, m_nInstance);
+        if (cbres)
+            return CBSDKRESULT_UNKNOWN;
+        break;
+    case cbSdkExtCmd_NSP_REBOOT:
+        pktLog.mode = cbLOG_MODE_NSP_REBOOT;
+        // send the packet
+        cbres = cbSendPacket(&pktLog, m_nInstance);
+        if (cbres)
+            return CBSDKRESULT_UNKNOWN;
+        break;
     default:
         return CBSDKRESULT_INVALIDPARAM;
         break;
@@ -2828,7 +3044,7 @@ cbSdkResult SdkApp::SdkExtDoCommand(cbSdkExtCmd * extCmd)
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::cbSdkExtCmd
+/// sdk stub for SdkApp::cbSdkExtCmd
 CBSDKAPI    cbSdkResult cbSdkExtDoCommand(UINT32 nInstance, cbSdkExtCmd * extCmd)
 {
     if (extCmd == NULL)
@@ -2842,14 +3058,14 @@ CBSDKAPI    cbSdkResult cbSdkExtDoCommand(UINT32 nInstance, cbSdkExtCmd * extCmd
 }
 
 // Author & Date:   Ehsan Azar     26 Oct 2011
-// Purpose: Send an analog output waveform, or monitor a channel.
-//           if none is given then analog output channel is disabled
-// Inputs:
-//   channel    - the channel number (1-based) must be digital output channel
-//   wf         - pointer to waveform structure
-//   mon        - the structure to specify monitoring channel
-// Outputs:
-//   returns the error code
+/** Send an analog output waveform, or monitor a channel. If none is given then analog output channel is disabled.
+*
+* @param[in]	channel     the channel number (1-based) must be digital output channel
+* @param[in]	wf			pointer to waveform structure
+* @param[in]	mon			the structure to specify monitoring channel
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkSetAnalogOutput(UINT16 channel, cbSdkWaveformData * wf, cbSdkAoutMon * mon)
 {
     if (m_instInfo == 0)
@@ -2930,7 +3146,9 @@ cbSdkResult SdkApp::SdkSetAnalogOutput(UINT16 channel, cbSdkWaveformData * wf, c
             dwOptions |= cbAOUT_MONITORSMP;
         if (mon->bTrack)
             dwOptions |= cbAOUT_TRACK;
-    } else {
+    }
+    else
+    {
         dwOptions &= ~(cbAOUT_MONITORSMP | cbAOUT_MONITORSPK);
     }
 
@@ -2951,30 +3169,35 @@ cbSdkResult SdkApp::SdkSetAnalogOutput(UINT16 channel, cbSdkWaveformData * wf, c
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetAnalogOutput
+/// sdk stub for SdkApp::SdkSetAnalogOutput
 CBSDKAPI    cbSdkResult cbSdkSetAnalogOutput(UINT32 nInstance,
                                              UINT16 channel, cbSdkWaveformData * wf, cbSdkAoutMon * mon)
 {
+    UINT32 nChan = channel;
+
+    if (!IsChanAnalogOut(channel) && !IsChanAudioOut(channel))
+        nChan = GetAnalogOrAudioOutChanNumber(channel);
+
     if (wf != NULL && mon != NULL)
         return CBSDKRESULT_INVALIDPARAM; // cannot specify both
-    if (channel < MIN_CHANS_ANALOG_OUT || channel > MAX_CHANS_AUDIO)
+    if (!IsChanAnalogOut(nChan) && !IsChanAudioOut(nChan))
         return CBSDKRESULT_INVALIDCHANNEL;
     if (nInstance >= cbMAXOPEN)
         return CBSDKRESULT_INVALIDPARAM;
     if (g_app[nInstance] == NULL)
         return CBSDKRESULT_CLOSED;
 
-    return g_app[nInstance]->SdkSetAnalogOutput(channel, wf, mon);
+    return g_app[nInstance]->SdkSetAnalogOutput(nChan, wf, mon);
 }
 
 // Author & Date:   Ehsan Azar     25 Feb 2011
-// Purpose: Activate or deactivate channels.
-//           Only activated channels are monitored.
-// Inputs:
-//   channel - channel number (1-based), zero means all channels
-//   bActive - the character set of the comment
-// Outputs:
-//   returns the error code
+/** Activate or deactivate channels. Only activated channels are monitored.
+*
+* @param[in]	channel     channel number (1-based), zero means all channels
+* @param[in]	bActive		the character set of the comment
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkSetChannelMask(UINT16 channel, UINT32 bActive)
 {
     if (m_instInfo == 0)
@@ -2990,7 +3213,7 @@ cbSdkResult SdkApp::SdkSetChannelMask(UINT16 channel, UINT32 bActive)
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetChannelMask
+/// sdk stub for SdkApp::SdkSetChannelMask
 CBSDKAPI    cbSdkResult cbSdkSetChannelMask(UINT32 nInstance, UINT16 channel, UINT32 bActive)
 {
     if (channel > cbMAXCHANS)
@@ -3004,13 +3227,14 @@ CBSDKAPI    cbSdkResult cbSdkSetChannelMask(UINT32 nInstance, UINT16 channel, UI
 }
 
 // Author & Date:   Ehsan Azar     25 Feb 2011
-// Purpose: Send a comment or custom event
-// Inputs:
-//   rgba    - the color or custom event number
-//   charset - the character set of the comment
-//   comment - comment string (can be NULL)
-// Outputs:
-//   returns the error code
+/** Send a comment or custom event.
+*
+* @param[in]	rgba     the color or custom event number
+* @param[in]	charset	 the character set of the comment
+* @param[in]	comment	 comment string (can be NULL)
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkSetComment(UINT32 rgba, UINT8 charset, const char * comment)
 {
     if (m_instInfo == 0)
@@ -3021,7 +3245,7 @@ cbSdkResult SdkApp::SdkSetComment(UINT32 rgba, UINT8 charset, const char * comme
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetComment
+/// sdk stub for SdkApp::SdkSetComment
 CBSDKAPI    cbSdkResult cbSdkSetComment(UINT32 nInstance, UINT32 rgba, UINT8 charset, const char * comment)
 {
     if (comment)
@@ -3038,12 +3262,13 @@ CBSDKAPI    cbSdkResult cbSdkSetComment(UINT32 nInstance, UINT32 rgba, UINT8 cha
 }
 
 // Author & Date:   Ehsan Azar     3 March 2011
-// Purpose: Send a full channel configuration packet
-// Inputs:
-//   channel  - channel number (1-based)
-//   chaninfo - the full channel configuration
-// Outputs:
-//   returns the error code
+/** Send a full channel configuration packet.
+*
+* @param[in]	channel     channel number (1-based)
+* @param[in]	chaninfo	the full channel configuration
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkSetChannelConfig(UINT16 channel, cbPKT_CHANINFO * chaninfo)
 {
     if (m_instInfo == 0)
@@ -3061,7 +3286,7 @@ cbSdkResult SdkApp::SdkSetChannelConfig(UINT16 channel, cbPKT_CHANINFO * chaninf
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetChannelConfig
+/// sdk stub for SdkApp::SdkSetChannelConfig
 CBSDKAPI    cbSdkResult cbSdkSetChannelConfig(UINT32 nInstance, UINT16 channel, cbPKT_CHANINFO * chaninfo)
 {
     if (channel == 0 || channel > cbMAXCHANS)
@@ -3075,7 +3300,7 @@ CBSDKAPI    cbSdkResult cbSdkSetChannelConfig(UINT32 nInstance, UINT16 channel, 
     if (chaninfo->chan != channel)
         return CBSDKRESULT_INVALIDCHANNEL;
 
-    // TODO: do more validation before sending the packet
+    /// \todo do more validation before sending the packet
 
     if (nInstance >= cbMAXOPEN)
         return CBSDKRESULT_INVALIDPARAM;
@@ -3092,6 +3317,13 @@ CBSDKAPI    cbSdkResult cbSdkSetChannelConfig(UINT32 nInstance, UINT16 channel, 
 // Outputs:
 //   chaninfo - the full channel configuration
 //   returns the error code
+/** Get a channel configuration packet.
+*
+* @param[in]	channel     channel number (1-based)
+* @param[in]	chaninfo	the full channel configuration
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetChannelConfig(UINT16 channel, cbPKT_CHANINFO * chaninfo)
 {
     if (m_instInfo == 0)
@@ -3107,7 +3339,7 @@ cbSdkResult SdkApp::SdkGetChannelConfig(UINT16 channel, cbPKT_CHANINFO * chaninf
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetChannelConfig
+/// sdk stub for SdkApp::SdkGetChannelConfig
 CBSDKAPI    cbSdkResult cbSdkGetChannelConfig(UINT32 nInstance, UINT16 channel, cbPKT_CHANINFO * chaninfo)
 {
     if (channel == 0 || channel > cbMAXCHANS)
@@ -3122,19 +3354,58 @@ CBSDKAPI    cbSdkResult cbSdkGetChannelConfig(UINT32 nInstance, UINT16 channel, 
     return g_app[nInstance]->SdkGetChannelConfig(channel, chaninfo);
 }
 
-// Author & Date:   Joshua Southerland    31 May 2013
-// Purpose: retrieve group info
+// Author & Date:   Tom Richins     11 Apr 2011
+// Purpose: retrieve group list
+//           wrapper to export cbGetSampleGroupList
+
+/** Retrieve group list.
+*
+* @param[in]		proc
+* @param[in]		group      group (1-5)
+* @param[in,out]	length     length of group list
+* @param[in,out]	list	   list of channels in selected group (1-based)
+
+
+* \n This function returns the error code
+*/
+cbSdkResult SdkApp::SdkGetSampleGroupList(UINT32 proc, UINT32 group, UINT32 *length, UINT16 *list)
+{
+    if (m_instInfo == 0)
+        return CBSDKRESULT_CLOSED;
+
+    cbRESULT cbres = cbGetSampleGroupList(proc, group, length, list, m_nInstance);
+    if (cbres == cbRESULT_INVALIDADDRESS)
+        return CBSDKRESULT_INVALIDPARAM;
+    if (cbres)
+        return CBSDKRESULT_UNKNOWN;
+    return CBSDKRESULT_SUCCESS;
+}
+
+/// sdk stub for SdkApp::SdkGetSampleGroupList
+CBSDKAPI    cbSdkResult cbSdkGetSampleGroupList(UINT32 nInstance,
+                                                UINT32 proc, UINT32 group, UINT32 *length, UINT16 *list)
+{
+    if (nInstance >= cbMAXOPEN)
+        return CBSDKRESULT_INVALIDPARAM;
+    if (g_app[nInstance] == NULL)
+        return CBSDKRESULT_CLOSED;
+
+    return g_app[nInstance]->SdkGetSampleGroupList(proc, group, length, list);
+}
+
+// Author & Date:   Sylvana Alpert     13 Jan 2014
+// Purpose: retrieve sample group info
 //           wrapper to export cbGetSampleGroupInfo
-//
-// Inputs:
-//   nInsane - cbsdk instance
-//   proc   - processor
-//   group  - group (1-6)
-// Outputs:
-//   label  - return of group label
-//   period - return of group sample period
-//   length - return of length of group list
-//   Returns the error code
+/** Retrieve group info.
+*
+* @param[in]		proc
+* @param[in]		group      group (1-5)
+* @param[in,out]	label
+* @param[in,out]	period	
+* @param[in,out]	length
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetSampleGroupInfo(UINT32 proc, UINT32 group, char *label, UINT32 *period, UINT32 *length)
 {
     if (m_instInfo == 0)
@@ -3148,9 +3419,9 @@ cbSdkResult SdkApp::SdkGetSampleGroupInfo(UINT32 proc, UINT32 group, char *label
     return CBSDKRESULT_SUCCESS;
 }
 
-
-// Purpose: sdk stub for SdkApp::SdkGetSampleGroupInfo
-CBSDKAPI    cbSdkResult cbSdkGetSampleGroupInfo(UINT32 nInstance, UINT32 proc, UINT32 group, char *label, UINT32 *period, UINT32 *length)
+/// sdk stub for SdkApp::SdkGetSampleGroupInfo
+CBSDKAPI    cbSdkResult cbSdkGetSampleGroupInfo(UINT32 nInstance,
+                                                UINT32 proc, UINT32 group, char *label, UINT32 *period, UINT32 *length)
 {
     if (nInstance >= cbMAXOPEN)
         return CBSDKRESULT_INVALIDPARAM;
@@ -3161,52 +3432,18 @@ CBSDKAPI    cbSdkResult cbSdkGetSampleGroupInfo(UINT32 nInstance, UINT32 proc, U
 }
 
 
-// Author & Date:   Tom Richins     11 Apr 2011
-// Purpose: retrieve group list
-//           wrapper to export cbGetSampleGroupList
-// Inputs:
-//   proc   - processor
-//   group  - group (1-5)
-//   length - return of length of group list
-//   list   - return list (pointer to UNIT32 array)
-// Outputs:
-//   length - return of length of group list
-//   list   - return list (UNIT32 array)
-//   Returns the error code
-cbSdkResult SdkApp::SdkGetSampleGroupList(UINT32 proc, UINT32 group, UINT32 *length, UINT32 *list)
-{
-    if (m_instInfo == 0)
-        return CBSDKRESULT_CLOSED;
-
-    cbRESULT cbres = cbGetSampleGroupList(proc, group, length, list, m_nInstance);
-    if (cbres == cbRESULT_INVALIDADDRESS)
-        return CBSDKRESULT_INVALIDPARAM;
-    if (cbres)
-        return CBSDKRESULT_UNKNOWN;
-    return CBSDKRESULT_SUCCESS;
-}
-
-// Purpose: sdk stub for SdkApp::SdkGetSampleGroupList
-CBSDKAPI    cbSdkResult cbSdkGetSampleGroupList(UINT32 nInstance,
-                                                UINT32 proc, UINT32 group, UINT32 *length, UINT32 *list)
-{
-    if (nInstance >= cbMAXOPEN)
-        return CBSDKRESULT_INVALIDPARAM;
-    if (g_app[nInstance] == NULL)
-        return CBSDKRESULT_CLOSED;
-
-    return g_app[nInstance]->SdkGetSampleGroupList(proc, group, length, list);
-}
-
 // Author & Date:   Tom Richins        24 Jun 2011
 // Purpose: Get filter description
 //           wrapper to export cbGetFilterDesc
-// Inputs:
-//  proc
-//    filter number
-// Outputs:
-//   filtdesc - the filter description
-//   returns the error code
+
+/** Get filter description.
+*
+* @param[in]		proc
+* @param[in]		filt		filter number
+* @param[out]		filtdesc	the filter description
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetFilterDesc(UINT32 proc, UINT32 filt, cbFILTDESC * filtdesc)
 {
     if (m_instInfo == 0)
@@ -3220,7 +3457,7 @@ cbSdkResult SdkApp::SdkGetFilterDesc(UINT32 proc, UINT32 filt, cbFILTDESC * filt
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetFilterDesc
+/// sdk stub for SdkApp::SdkGetFilterDesc
 CBSDKAPI    cbSdkResult cbSdkGetFilterDesc(UINT32 nInstance, UINT32 proc, UINT32 filt, cbFILTDESC * filtdesc)
 {
     if (filtdesc == NULL)
@@ -3236,13 +3473,16 @@ CBSDKAPI    cbSdkResult cbSdkGetFilterDesc(UINT32 nInstance, UINT32 proc, UINT32
 // Author & Date:   Ehsan Azar     27 Oct 2011
 // Purpose: retrieve group list
 //           wrapper to export cbGetTrackObj
-// Inputs:
-//   id - trackable object ID (1 to cbMAXTRACKOBJ)
-// Outputs:
-//   name - name of the video source
-//   type - type of the trackable object (start from 0)
-//   pointCount - the maximum number of points for this trackable
-//   Returns the error code
+
+/** Retrieve tracking information.
+*
+* @param[in]		id			trackable object ID (1 to cbMAXTRACKOBJ)
+* @param[out]		name		name of the video source
+* @param[out]		type		type of the trackable object (start from 0)
+* @param[out]		pointCount	the maximum number of points for this trackable
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetTrackObj(char * name, UINT16 * type, UINT16 * pointCount, UINT32 id)
 {
     if (m_instInfo == 0)
@@ -3256,7 +3496,7 @@ cbSdkResult SdkApp::SdkGetTrackObj(char * name, UINT16 * type, UINT16 * pointCou
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetTrackObj
+/// sdk stub for SdkApp::SdkGetTrackObj
 CBSDKAPI    cbSdkResult cbSdkGetTrackObj(UINT32 nInstance, char * name, UINT16 * type, UINT16 * pointCount, UINT32 id)
 {
     if (nInstance >= cbMAXOPEN)
@@ -3270,12 +3510,15 @@ CBSDKAPI    cbSdkResult cbSdkGetTrackObj(UINT32 nInstance, char * name, UINT16 *
 // Author & Date:   Ehsan Azar     27 Oct 2011
 // Purpose: retrieve group list
 //           wrapper to export cbGetVideoSource
-// Inputs:
-//   id - video source ID (1 to cbMAXVIDEOSOURCE)
-// Outputs:
-//   name - name of the video source
-//   fps  - the frame rate of the video source
-//   Returns the error code
+
+/** Retrieve video source.
+*
+* @param[in]		id			video source ID (1 to cbMAXVIDEOSOURCE)
+* @param[out]		name		name of the video source
+* @param[out]		fps			the frame rate of the video source
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetVideoSource(char * name, float * fps, UINT32 id)
 {
     if (m_instInfo == 0)
@@ -3291,7 +3534,7 @@ cbSdkResult SdkApp::SdkGetVideoSource(char * name, float * fps, UINT32 id)
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetVideoSource
+/// sdk stub for SdkApp::SdkGetVideoSource
 CBSDKAPI    cbSdkResult cbSdkGetVideoSource(UINT32 nInstance, char * name, float * fps, UINT32 id)
 {
     if (nInstance >= cbMAXOPEN)
@@ -3303,11 +3546,13 @@ CBSDKAPI    cbSdkResult cbSdkGetVideoSource(UINT32 nInstance, char * name, float
 }
 
 // Author & Date:   Ehsan Azar     30 March 2011
-// Purpose: Send global spike configuration
-//   spklength  - spike length
-//   spkpretrig - spike pre-trigger number of samples
-// Outputs:
-//   returns the error code
+/** Send global spike configuration.
+*
+* @param[in]		spklength		spike length
+* @param[in]		spkpretrig		spike pre-trigger number of samples
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkSetSpikeConfig(UINT32 spklength, UINT32 spkpretrig)
 {
     if (m_instInfo == 0)
@@ -3320,7 +3565,7 @@ cbSdkResult SdkApp::SdkSetSpikeConfig(UINT32 spklength, UINT32 spkpretrig)
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSetSpikeConfig
+/// sdk stub for SdkApp::SdkSetSpikeConfig
 CBSDKAPI    cbSdkResult cbSdkSetSpikeConfig(UINT32 nInstance, UINT32 spklength, UINT32 spkpretrig)
 {
     if (spklength > cbMAX_PNTS || spkpretrig >= spklength)
@@ -3334,12 +3579,14 @@ CBSDKAPI    cbSdkResult cbSdkSetSpikeConfig(UINT32 nInstance, UINT32 spklength, 
 }
 
 // Author & Date:   Ehsan Azar     30 March 2011
-// Purpose: Get global system configuration
-// Outputs:
-//   spklength  - spike length
-//   spkpretrig - spike pre-trigger number of samples
-//   sysfreq    - system clock frequency in Hz
-//   returns the error code
+/** Get global system configuration.
+*
+* @param[out]		spklength		spike length
+* @param[out]		spkpretrig		spike pre-trigger number of samples
+* @param[out]		sysfreq			system clock frequency in Hz
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkGetSysConfig(UINT32 * spklength, UINT32 * spkpretrig, UINT32 * sysfreq)
 {
     if (m_instInfo == 0)
@@ -3352,7 +3599,7 @@ cbSdkResult SdkApp::SdkGetSysConfig(UINT32 * spklength, UINT32 * spkpretrig, UIN
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkGetSysConfig
+/// sdk stub for SdkApp::SdkGetSysConfig
 CBSDKAPI    cbSdkResult cbSdkGetSysConfig(UINT32 nInstance, UINT32 * spklength, UINT32 * spkpretrig, UINT32 * sysfreq)
 {
     if (spklength == NULL && spkpretrig == NULL && sysfreq == NULL)
@@ -3366,10 +3613,12 @@ CBSDKAPI    cbSdkResult cbSdkGetSysConfig(UINT32 nInstance, UINT32 * spklength, 
 }
 
 // Author & Date:   Ehsan Azar     11 MAy 2012
-// Purpose: Perform given runlevel system command
-// Outputs:
-//   cmd  - system command to perform
-//   returns the error code
+/** Perform given runlevel system command.
+*
+* @param[out]		cmd		system command to perform
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkSystem(cbSdkSystemType cmd)
 {
     if (m_instInfo == 0)
@@ -3401,7 +3650,7 @@ cbSdkResult SdkApp::SdkSystem(cbSdkSystemType cmd)
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkSystem
+/// sdk stub for SdkApp::SdkSystem
 CBSDKAPI    cbSdkResult cbSdkSystem(UINT32 nInstance, cbSdkSystemType cmd)
 {
     if (nInstance >= cbMAXOPEN)
@@ -3413,13 +3662,14 @@ CBSDKAPI    cbSdkResult cbSdkSystem(UINT32 nInstance, cbSdkSystemType cmd)
 }
 
 // Author & Date:   Ehsan Azar     28 Feb 2011
-// Purpose: Register a callback function
-// Inputs:
-//   callbacktype  - the calback type to register function against
-//   m_pCallbackFn   - callback function
-//   m_pCallbackData - custom parameter callback is called with
-// Outputs:
-//   returns the error code
+/** Register a callback function.
+*
+* @param[in]	callbacktype		the calback type to register function against
+* @param[in]	m_pCallbackFn		callback function
+* @param[in]	m_pCallbackData		custom parameter callback is called with
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkRegisterCallback(cbSdkCallbackType callbacktype, cbSdkCallback pCallbackFn, void * pCallbackData)
 {
     if (m_instInfo == 0)
@@ -3434,7 +3684,7 @@ cbSdkResult SdkApp::SdkRegisterCallback(cbSdkCallbackType callbacktype, cbSdkCal
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkRegisterCallback
+/// sdk stub for SdkApp::SdkRegisterCallback
 CBSDKAPI    cbSdkResult cbSdkRegisterCallback(UINT32 nInstance,
                                               cbSdkCallbackType callbacktype, cbSdkCallback pCallbackFn, void * pCallbackData)
 {
@@ -3451,11 +3701,12 @@ CBSDKAPI    cbSdkResult cbSdkRegisterCallback(UINT32 nInstance,
 }
 
 // Author & Date:   Ehsan Azar     28 Feb 2011
-// Purpose: Unregister the current callback
-// Inputs:
-//   callbacktype - the calback type to unregister
-// Outputs:
-//   returns the error code
+/** Unregister the current callback.
+*
+* @param[in]	callbacktype		the calback type to unregister
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkUnRegisterCallback(cbSdkCallbackType callbacktype)
 {
     if (m_instInfo == 0)
@@ -3470,7 +3721,7 @@ cbSdkResult SdkApp::SdkUnRegisterCallback(cbSdkCallbackType callbacktype)
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkUnRegisterCallback
+/// sdk stub for SdkApp::SdkUnRegisterCallback
 CBSDKAPI    cbSdkResult cbSdkUnRegisterCallback(UINT32 nInstance, cbSdkCallbackType callbacktype)
 {
     if (callbacktype >= CBSDKCALLBACK_COUNT)
@@ -3483,43 +3734,15 @@ CBSDKAPI    cbSdkResult cbSdkUnRegisterCallback(UINT32 nInstance, cbSdkCallbackT
     return g_app[nInstance]->SdkUnRegisterCallback(callbacktype);
 }
 
-// Author & Date:   Ehsan Azar     7 Aug 2013
-// Purpose: Get callback status
-//           if unregistered returns success, and means a register should not fail
-// Inputs:
-//   callbacktype - the calback type to unregister
-// Outputs:
-//   returns the error code
-cbSdkResult SdkApp::SdkCallbackStatus(cbSdkCallbackType callbacktype)
-{
-    if (m_instInfo == 0)
-        return CBSDKRESULT_CLOSED;
-    if (m_pCallback[callbacktype])
-        return CBSDKRESULT_CALLBACKREGFAILED; // Already registered
-    return CBSDKRESULT_SUCCESS;
-}
-
-// Purpose: sdk stub for SdkApp::SdkCallbackStatus
-CBSDKAPI    cbSdkResult cbSdkCallbackStatus(UINT32 nInstance, cbSdkCallbackType callbacktype)
-{
-    if (callbacktype >= CBSDKCALLBACK_COUNT)
-        return CBSDKRESULT_INVALIDCALLBACKTYPE;
-    if (nInstance >= cbMAXOPEN)
-        return CBSDKRESULT_INVALIDPARAM;
-    if (g_app[nInstance] == NULL)
-        return CBSDKRESULT_CLOSED;
-
-    return g_app[nInstance]->SdkCallbackStatus(callbacktype);
-}
-
 // Author & Date:   Ehsan Azar     21 Feb 2013
-// Purpose: Convert volts string (e.g. '5V', '-65mV', ...) to its raw digital value equivalent for given channel
-// Inputs:
-//   channel           - the channel number (1-based)
-//   szVoltsUnitString - the volts string
-// Outputs:
-//   digital - the raw digital value
-//   returns the error code
+/** Convert volts string (e.g. '5V', '-65mV', ...) to its raw digital value equivalent for given channel.
+*
+* @param[in]	channel				the channel number (1-based)
+* @param[in]	szVoltsUnitString	the volts string
+* @param[out]	digital				the raw digital value
+
+* \n This function returns the error code
+*/
 cbSdkResult SdkApp::SdkAnalogToDigital(UINT16 channel, const char * szVoltsUnitString, INT32 * digital)
 {
     if (m_instInfo == 0)
@@ -3532,12 +3755,7 @@ cbSdkResult SdkApp::SdkAnalogToDigital(UINT16 channel, const char * szVoltsUnitS
     INT32 nFactor = 0;
     std::string strVolts = szVoltsUnitString;
     std::string strUnit = "";
-    if (strVolts.rfind("V") != std::string::npos)
-    {
-        nFactor = 1;
-        strUnit = "V";
-    }
-    else if (strVolts.rfind("mV") != std::string::npos)
+    if (strVolts.rfind("mV") != std::string::npos)
     {
         nFactor = 1000;
         strUnit = "mV";
@@ -3552,6 +3770,11 @@ cbSdkResult SdkApp::SdkAnalogToDigital(UINT16 channel, const char * szVoltsUnitS
         nFactor = 1000000000;
         strUnit = "nV";
     }
+    else if (strVolts.rfind("V") != std::string::npos)
+    {
+        nFactor = 1;
+        strUnit = "V";
+    }
     char * pEnd = NULL;
     double dValue = 0;
     long nValue = 0;
@@ -3559,7 +3782,9 @@ cbSdkResult SdkApp::SdkAnalogToDigital(UINT16 channel, const char * szVoltsUnitS
     if (nFactor == 0)
     {
         nValue = strtol(szVoltsUnitString, &pEnd, 0);
-    } else {
+    }
+    else
+    {
         dValue = strtod(szVoltsUnitString, &pEnd);
     }
     if (pEnd == szVoltsUnitString)
@@ -3597,7 +3822,7 @@ cbSdkResult SdkApp::SdkAnalogToDigital(UINT16 channel, const char * szVoltsUnitS
     return CBSDKRESULT_SUCCESS;
 }
 
-// Purpose: sdk stub for SdkApp::SdkAnalogToDigital
+/// sdk stub for SdkApp::SdkAnalogToDigital
 CBSDKAPI    cbSdkResult cbSdkAnalogToDigital(UINT32 nInstance, UINT16 channel, const char * szVoltsUnitString, INT32 * digital)
 {
     if (channel == 0 || channel > cbMAXCHANS)
@@ -3613,13 +3838,13 @@ CBSDKAPI    cbSdkResult cbSdkAnalogToDigital(UINT32 nInstance, UINT16 channel, c
 }
 
 // Author & Date: Ehsan Azar       29 April 2012
-// Purpose: Sdk app base constructor
+/// Sdk app base constructor
 SdkApp::SdkApp() :
     m_bInitialized(false), m_lastCbErr(cbRESULT_OK),
     m_uTrialBeginChannel(0), m_uTrialBeginMask(0), m_uTrialBeginValue(0), m_uTrialEndChannel(0), m_uTrialEndMask(0), m_uTrialEndValue(0),
     m_bTrialDouble(false), m_bTrialAbsolute(false),
     m_uTrialWaveforms(0), m_uTrialConts(0), m_uTrialEvents(0), m_uTrialComments(0), m_uTrialTrackings(0),
-    m_bWithinTrial(FALSE), m_uTrialStartTime(0), m_uCbsdkTime(0),
+    m_bWithinTrial(FALSE), m_uTrialStartTime(0), m_uCbsdkTime(0), m_bPacketsEvent(false), m_bPacketsCmt(false), m_bPacketsTrack(false),
     m_CD(NULL), m_ED(NULL), m_CMT(NULL), m_TR(NULL)
 {
     memset(&m_lastPktVideoSynch, 0, sizeof(m_lastPktVideoSynch));
@@ -3637,7 +3862,7 @@ SdkApp::SdkApp() :
 }
 
 // Author & Date: Ehsan Azar       29 April 2012
-// Purpose: Sdk app base destructor
+/// Sdk app base destructor
 SdkApp::~SdkApp()
 {
     // Close networking
@@ -3645,13 +3870,14 @@ SdkApp::~SdkApp()
 }
 
 // Author & Date: Ehsan Azar       29 April 2012
-// Purpose: Open sdk application, network and Qt message loop
-// Inputs:
-//   nInstance - instance ID
-//   nInPort   - Client port number
-//   nOutPort  - Instrument port number
-//   szInIP;   - Client IPv4 address
-//   szOutIP   - Instrument IPv4 address
+/** Open sdk application, network and Qt message loop.
+*
+* @param[in]	nInstance		instance ID
+* @param[in]	nInPort			Client port number
+* @param[in]	nOutPort		Instrument port number
+* @param[in]	szInIP			Client IPv4 address
+* @param[in]	szOutIP			Instrument IPv4 address
+*/
 void SdkApp::Open(UINT32 nInstance, int nInPort, int nOutPort, LPCSTR szInIP, LPCSTR szOutIP, int nRecBufSize)
 {
     // clear las library error
@@ -3676,18 +3902,12 @@ void SdkApp::Open(UINT32 nInstance, int nInPort, int nOutPort, LPCSTR szInIP, LP
     m_strInIP = szInIP;
     m_strOutIP = szOutIP;
 
-#ifndef WIN32
-    // On Linux bind ot broadcast
-    if (m_strInIP.endsWith(".255"))
-        m_bBroadcast = true;
-#endif
-
     // Restart networking thread
     start(QThread::HighPriority);
 }
 
 // Author & Date: Ehsan Azar       29 April 2012
-// Purpose: Proxy for all incomming packets
+/// Proxy for all incomming packets
 void SdkApp::ProcessIncomingPacket(const cbPKT_GENERIC * const pPkt)
 {
     // This is a hot code path, and crosses the shared library
@@ -3802,13 +4022,25 @@ void SdkApp::ProcessIncomingPacket(const cbPKT_GENERIC * const pPkt)
                 if (m_pLateCallback[CBSDKCALLBACK_SYNCH])
                     m_pLateCallback[CBSDKCALLBACK_SYNCH](m_nInstance, cbSdkPkt_SYNCH, pPkt, m_pLateCallbackParams[CBSDKCALLBACK_SYNCH]);
             }
+            else if (pPkt->type == cbPKTTYPE_LOGREP)
+            {
+                if (m_pLateCallback[CBSDKCALLBACK_ALL])
+                    m_pLateCallback[CBSDKCALLBACK_ALL](m_nInstance, cbSdkPkt_LOG, pPkt, m_pLateCallbackParams[CBSDKCALLBACK_ALL]);
+                // Late bind before usage
+                LateBindCallback(CBSDKCALLBACK_LOG);
+                if (m_pLateCallback[CBSDKCALLBACK_LOG])
+                    m_pLateCallback[CBSDKCALLBACK_LOG](m_nInstance, cbSdkPkt_LOG, pPkt, m_pLateCallbackParams[CBSDKCALLBACK_LOG]);
+                // Fillout trial if setup
+                OnPktLog(reinterpret_cast<const cbPKT_LOG*>(pPkt));
+                //OnPktComment(reinterpret_cast<const cbPKT_COMMENT*>(pPkt));
+            }
         } // end if (pPkt->chid==0x8000
     } // end if (pPkt->chid & 0x8000
     else if (pPkt->chid == 0)
     {
         // No mask applied here
         // Inside the callback cbPKT_GROUP.type can be used to find the sample group number
-        UINT8 smpgroup = ((cbPKT_GROUP *)pPkt)->type; // smaple group
+        UINT8 smpgroup = ((cbPKT_GROUP *)pPkt)->type; // sample group
         if (smpgroup > 0 && smpgroup <= cbMAXGROUPS)
         {
             if (m_pLateCallback[CBSDKCALLBACK_ALL])
@@ -3820,7 +4052,7 @@ void SdkApp::ProcessIncomingPacket(const cbPKT_GENERIC * const pPkt)
         }
     }
     // check for channel event packets cerebus channels 1-144
-    else if (pPkt->chid < cbNUM_ANALOG_CHANS + 1)   // channels are 1 based
+    else if (pPkt->chid < cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans() + 1)   // channels are 1 based
     {
         if (pPkt->chid > 0 && m_bChannelMask[pPkt->chid - 1])
         {
@@ -3833,7 +4065,7 @@ void SdkApp::ProcessIncomingPacket(const cbPKT_GENERIC * const pPkt)
         }
     }
     // catch digital input port events and save them as NSAS experiment event packets
-    else if (pPkt->chid == MAX_CHANS_DIGITAL_IN)
+    else if (IsChanDigin(pPkt->chid))
     {
         if (m_bChannelMask[pPkt->chid - 1])
         {
@@ -3846,7 +4078,7 @@ void SdkApp::ProcessIncomingPacket(const cbPKT_GENERIC * const pPkt)
         }
     }
     // catch serial input port events and save them as NSAS experiment event packets
-    else if (pPkt->chid == MAX_CHANS_SERIAL)
+    else if (IsChanSerial(pPkt->chid))
     {
         if (m_bChannelMask[pPkt->chid - 1])
         {
@@ -3869,12 +4101,12 @@ void SdkApp::ProcessIncomingPacket(const cbPKT_GENERIC * const pPkt)
         OnPktGroup(reinterpret_cast<const cbPKT_GROUP*>(pPkt));
 
     // and only look at event data packets
-    if ( pPkt->chid == MAX_CHANS_DIGITAL_IN || pPkt->chid == MAX_CHANS_SERIAL || (pPkt->chid > 0 && pPkt->chid <= cbNUM_ANALOG_CHANS) )
+    if (IsChanDigin(pPkt->chid) || IsChanSerial(pPkt->chid) || IsChanAnalogIn(pPkt->chid))
         OnPktEvent(pPkt);
 }
 
 // Author & Date: Ehsan Azar       29 April 2012
-// Purpose: Network events
+/// Network events
 void SdkApp::OnInstNetworkEvent(NetEventType type, unsigned int code)
 {
     cbSdkPktLostEvent lostEvent;

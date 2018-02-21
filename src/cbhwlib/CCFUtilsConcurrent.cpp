@@ -1,6 +1,7 @@
+// =STS=> CCFUtilsConcurrent.cpp[5046].aa02   submit   SMID:3 
 //////////////////////////////////////////////////////////////////////
 //
-// (c) Copyright 2012-2013 Blackrock Microsystems
+// (c) Copyright 2012 - 2013 Blackrock Microsystems
 //
 // $Workfile: CCFUtilsConcurrent.cpp $
 // $Archive: /Cerebus/Human/WindowsApps/cbhwlib/CCFUtilsConcurrent.cpp $
@@ -90,3 +91,4 @@ void ccf::ConWriteCCF(LPCSTR szFileName, cbCCF * pCCF, cbCCFCallback pCallbackFn
     // Parameters are copied before thread starts, originals will go out of scope
     QtConcurrent::run(WriteCCFHelper, strFileName, ccf, pCallbackFn, nInstance);
 }
+

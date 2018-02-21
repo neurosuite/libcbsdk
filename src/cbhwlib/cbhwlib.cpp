@@ -1,11 +1,10 @@
-// =STS=> cbhwlib.cpp[2730].aa14   open     SMID:15 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Cerebus Interface Library
 //
 // Copyright (C) 2001-2003 Bionic Technologies, Inc.
 // (c) Copyright 2003-2008 Cyberkinetics, Inc
-// (c) Copyright 2008-2013 Blackrock Microsystems
+// (c) Copyright 2008-2017 Blackrock Microsystems
 //
 // Developed by Shane Guillory and Angela Wang
 //
@@ -657,7 +656,7 @@ cbRESULT cbGetBankInfo(UINT32 proc, UINT32 bank, cbBANKINFO *bankinfo, UINT32 nI
     if (!cb_library_initialized[nIdx]) return cbRESULT_NOLIBRARY;
 
     // Test that the addresses are valid and that requested procinfo structure is not empty
-    if (((proc - 1) >= cbMAXPROCS) || ((bank - 1) >= cbMAXBANKS)) return cbRESULT_INVALIDADDRESS;
+    if (((proc - 1) >= cbMAXPROCS) || ((bank - 1) >= cb_cfg_buffer_ptr[nIdx]->procinfo[0].bankcount)) return cbRESULT_INVALIDADDRESS;
     if (cb_cfg_buffer_ptr[nIdx]->bankinfo[proc - 1][bank - 1].chid == 0) return cbRESULT_INVALIDADDRESS;
 
     // otherwise, return the data
@@ -1008,7 +1007,7 @@ cbRESULT cbSetComment(UINT8 charset, UINT8 flags, UINT32 data, const char * comm
     if (comment)
         strncpy(pktComment.comment, comment, cbMAX_COMMENT);
     pktComment.comment[cbMAX_COMMENT - 1] = 0;
-    nLen = (UINT32)strlen(pktComment.comment);
+    nLen = (UINT32)strlen(pktComment.comment) + 1;      // include terminating null
     pktComment.dlen           = (UINT32)cbPKTDLEN_COMMENTSHORT + (nLen + 3) / 4;
 
     // Enter the packet into the XMT buffer queue
@@ -1262,8 +1261,8 @@ cbRESULT cbGetAoutWaveform(UINT32 channel, UINT8  trigNum, UINT16  * mode, UINT3
     if (!(cb_cfg_buffer_ptr[nIdx]->chaninfo[channel - 1].chancaps & cbCHAN_AOUT)) return cbRESULT_INVALIDFUNCTION;
     if (!(cb_cfg_buffer_ptr[nIdx]->chaninfo[channel - 1].aoutcaps & cbAOUT_WAVEFORM)) return cbRESULT_INVALIDFUNCTION;
     if (trigNum >= cbMAX_AOUT_TRIGGER) return cbRESULT_INVALIDFUNCTION;
-    if (channel <= cbFIRST_ANAOUT_CHAN) return cbRESULT_INVALIDCHANNEL;
-    channel -= (cbFIRST_ANAOUT_CHAN + 1); // make it 0-based
+    if (channel <= cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans()) return cbRESULT_INVALIDCHANNEL;
+    channel -= (cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans() + 1); // make it 0-based
     if (channel >= AOUT_NUM_GAIN_CHANS) return cbRESULT_INVALIDCHANNEL;
     if (cb_cfg_buffer_ptr[nIdx]->isWaveform[channel][trigNum].type == 0) return cbRESULT_INVALIDCHANNEL;
 
@@ -1326,7 +1325,7 @@ cbRESULT cbGetSampleGroupInfo( UINT32 proc, UINT32 group, char *label, UINT32 *p
 }
 
 
-cbRESULT cbGetSampleGroupList( UINT32 proc, UINT32 group, UINT32 *length, UINT32 *list, UINT32 nInstance)
+cbRESULT cbGetSampleGroupList( UINT32 proc, UINT32 group, UINT32 *length, UINT16 *list, UINT32 nInstance)
 {
     UINT32 nIdx = cb_library_index[nInstance];
 
@@ -1346,7 +1345,7 @@ cbRESULT cbGetSampleGroupList( UINT32 proc, UINT32 group, UINT32 *length, UINT32
 
     if (list)
         memcpy(list,&(cb_cfg_buffer_ptr[nIdx]->groupinfo[proc-1][group-1].list[0]),
-                    cb_cfg_buffer_ptr[nIdx]->groupinfo[proc-1][group-1].length * 4);
+                    cb_cfg_buffer_ptr[nIdx]->groupinfo[proc-1][group-1].length * sizeof(cb_cfg_buffer_ptr[nIdx]->groupinfo[proc-1][group-1].list[0]));
 
     return cbRESULT_OK;
 }
@@ -1793,7 +1792,8 @@ cbRESULT cbGetDoutCaps(UINT32 chan, UINT32 *doutcaps, UINT32 nInstance)
 
 // Purpose: Digital Output Inquiry and Configuration Functions
 //
-cbRESULT cbGetDoutOptions(UINT32 chan, UINT32 *options, UINT32 *monchan, UINT32 *value, UINT32 nInstance)
+cbRESULT cbGetDoutOptions(UINT32 chan, UINT32 *options, UINT32 *monchan, UINT32 *value,
+                          UINT8 *triggertype, UINT16 *trigchan, UINT16 *trigval, UINT32 nInstance)
 {
     UINT32 nIdx = cb_library_index[nInstance];
 
@@ -1806,16 +1806,20 @@ cbRESULT cbGetDoutOptions(UINT32 chan, UINT32 *options, UINT32 *monchan, UINT32 
     if (!(cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].chancaps & cbCHAN_DOUT)) return cbRESULT_INVALIDFUNCTION;
 
     // Return the requested data from the rec buffer
-    if (options) *options = cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].doutopts;
-    if (monchan) *monchan = cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].monsource;
-    if (value)   *value   = cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].outvalue;
+    if (options)		*options		= cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].doutopts;
+    if (monchan)		*monchan		= cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].monsource;
+    if (value)			*value			= cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].outvalue;
+    if (triggertype)    *triggertype	= cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].trigtype;
+    if (trigchan)		*trigchan		= cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].trigchan;
+    if (trigval)        *trigval		= cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].trigval;
 
     return cbRESULT_OK;
 }
 
 // Purpose: Digital Output Inquiry and Configuration Functions
 //
-cbRESULT cbSetDoutOptions(UINT32 chan, UINT32 options, UINT32 monchan, UINT32 value, UINT32 nInstance)
+cbRESULT cbSetDoutOptions(UINT32 chan, UINT32 options, UINT32 monchan, UINT32 value,
+                          UINT8 triggertype, UINT16 trigchan, UINT16 trigval, UINT32 nInstance)
 {
     UINT32 nIdx = cb_library_index[nInstance];
 
@@ -1837,6 +1841,9 @@ cbRESULT cbSetDoutOptions(UINT32 chan, UINT32 options, UINT32 monchan, UINT32 va
     chaninfo.doutopts  = options;
     chaninfo.monsource = monchan;
     chaninfo.outvalue  = value;
+    chaninfo.trigtype  = triggertype;	
+    chaninfo.trigchan  = trigchan;
+    chaninfo.trigval   = trigval;
 
     // Enter the packet into the XMT buffer queue
     return cbSendPacket(&chaninfo, nInstance);
@@ -1977,6 +1984,7 @@ cbRESULT cbGetAinpDisplay(UINT32 chan, INT32 *smpdispmin, INT32 *smpdispmax, INT
     // Test that the channel address is valid and initialized
     if ((chan - 1) >= cbMAXCHANS) return cbRESULT_INVALIDCHANNEL;
     if (cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].chid == 0) return cbRESULT_INVALIDCHANNEL;
+    if ((cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].chancaps & cbCHAN_AINP) != cbCHAN_AINP) return cbRESULT_INVALIDCHANNEL;
 
     // Return the requested data from the cfg buffer
     if (smpdispmin) *smpdispmin = cb_cfg_buffer_ptr[nIdx]->chaninfo[chan - 1].smpdispmin;
@@ -2901,6 +2909,12 @@ cbRESULT cbCheckforData(cbLevelOfConcern & nLevelOfConcern, UINT32 *pktstogo /* 
 
     nLevelOfConcern = static_cast<cbLevelOfConcern>( (nDiff * LOC_COUNT) / cbRECBUFFLEN );
 
+    // make sure to return a valid value
+    if (nLevelOfConcern < LOC_LOW)
+        nLevelOfConcern = LOC_LOW;
+    if (nLevelOfConcern > LOC_CRITICAL)
+        nLevelOfConcern = LOC_CRITICAL;
+
     return cbRESULT_OK;
 }
 
@@ -3197,8 +3211,8 @@ cbRESULT CreateSharedObjects(UINT32 nInstance)
     // Create the shared transmit buffer; if unsuccessful, release rec buffer and associated error code
     {
         // declare the length of the buffer in UINT32 units
-        const UINT32 cbXMT_GLOBAL_BUFFLEN = (cbCER_UDP_SIZE_MAX / 4) * 500 + 2;    // room for 500 packets
-        const UINT32 cbXMT_LOCAL_BUFFLEN  = (cbCER_UDP_SIZE_MAX / 4) * 200 + 2;    // room for 200 packets
+        const UINT32 cbXMT_GLOBAL_BUFFLEN = (cbCER_UDP_SIZE_MAX / 4) * 5000 + 2;    // room for 500 packets		//hls ??
+        const UINT32 cbXMT_LOCAL_BUFFLEN  = (cbCER_UDP_SIZE_MAX / 4) * 2000 + 2;    // room for 200 packets		//HLS ??
 
         // determine the XMT buffer structure size (header + data field)
         const UINT32 cbXMT_GLOBAL_BUFFSTRUCTSIZE = sizeof(cbXMTBUFF) + (sizeof(UINT32)*cbXMT_GLOBAL_BUFFLEN);

@@ -1,8 +1,7 @@
-/* =STS=> cbhwlib.h[1687].aa78   submit   SMID:82 */
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// (c) Copyright 2002-2008 Cyberkinetics, Inc.
-// (c) Copyright 2008-2011 Blackrock Microsystems
+// (c) Copyright 2002 - 2008 Cyberkinetics, Inc.
+// (c) Copyright 2008 - 2017 Blackrock Microsystems
 //
 // $Workfile: cbhwlib.h $
 // $Archive: /Cerebus/Human/LinuxApps/player/cbhwlib.h $
@@ -68,10 +67,14 @@
 #pragma pack(push, 1)
 
 #define cbVERSION_MAJOR  3
-#define cbVERSION_MINOR  10
+#define cbVERSION_MINOR  11
 
 // Version history:
-//  3.10- 10 0ct 2015 ffr - Temporarly patch 3.9 to be API compatible with 3.10
+// 3.11 - 17 Jan 2017 hls - Changed list in cbPKT_GROUPINFO from UINT32 to UINT16 to allow for 256-channels
+// 3.10 - 23 Oct 2014 hls - Added reboot capability for extension loader
+//        26 Jul 2014 js  - Added analog output to extension
+//        18 Mar 2014 sa  - Add triggered digital output
+//         3 Mar 2013 eaz - Adjust MTU
 //  3.9 - 23 Jan 2012 eaz - Expanded Analogout Waveform packet
 //        29 Apr 2012 eaz - Added cross-platform glue
 //        06 Nov 2012 eaz - Added multiple library instance handling
@@ -158,6 +161,8 @@ typedef unsigned short  UINT16;
 typedef signed int      INT32;
 typedef unsigned int    UINT32;
 
+typedef UINT8           DLEN;
+
 #ifndef WIN32
 # if __WORDSIZE == 64
 typedef long int                 INT64;
@@ -237,7 +242,7 @@ typedef unsigned int UINT;
 #define cbMAXSITEPLOTS ((cbMAXSITES - 1) * cbMAXSITES / 2)  // combination of 2 out of n is n!/((n-2)!2!) -- the only issue is the display
 
 // Channel Definitions
-#define cbNUM_FE_CHANS        128                                       // #Front end channels
+#define cbNUM_FE_CHANS        256                                       // #Front end channels
 #define cbNUM_ANAIN_CHANS     16                                        // #Analog Input channels
 #define cbNUM_ANALOG_CHANS    (cbNUM_FE_CHANS + cbNUM_ANAIN_CHANS)      // Total Analog Inputs
 #define cbNUM_ANAOUT_CHANS    4                                         // #Analog Output channels
@@ -770,6 +775,7 @@ cbRESULT cbSetDinpOptions(UINT32 chan, UINT32 options, UINT32 eopchar, UINT32 nI
 #define  cbDOUT_VALUE               0x00010000  // Port can be manually configured
 #define  cbDOUT_TRACK               0x00020000  // Port should track the most recently selected channel
 #define  cbDOUT_FREQUENCY           0x00040000  // Port can output a frequency
+#define  cbDOUT_TRIGGERED           0x00080000  // Port can be triggered
 #define  cbDOUT_MONITOR_UNIT0       0x01000000  // Can monitor unit 0 = UNCLASSIFIED
 #define  cbDOUT_MONITOR_UNIT1       0x02000000  // Can monitor unit 1
 #define  cbDOUT_MONITOR_UNIT2       0x04000000  // Can monitor unit 2
@@ -778,6 +784,14 @@ cbRESULT cbSetDinpOptions(UINT32 chan, UINT32 options, UINT32 eopchar, UINT32 nI
 #define  cbDOUT_MONITOR_UNIT5       0x20000000  // Can monitor unit 5
 #define  cbDOUT_MONITOR_UNIT_ALL    0x3F000000  // Can monitor ALL units
 #define  cbDOUT_MONITOR_SHIFT_TO_FIRST_UNIT 24  // This tells us how many bit places to get to unit 1
+// Trigger types for Digital Output channels
+#define  cbDOUT_TRIGGER_NONE          0   // instant software trigger
+#define  cbDOUT_TRIGGER_DINPRISING    1   // digital input rising edge trigger
+#define  cbDOUT_TRIGGER_DINPFALLING   2   // digital input falling edge trigger
+#define  cbDOUT_TRIGGER_SPIKEUNIT     3   // spike unit
+#define  cbDOUT_TRIGGER_NM			  4   // comment RGBA color (A being big byte)
+#define  cbDOUT_TRIGGER_SOFTRESET     5   // soft-reset trigger
+#define  cbDOUT_TRIGGER_EXTENSION     6   // extension trigger
 
 #ifdef __cplusplus
 
@@ -790,8 +804,10 @@ cbRESULT cbGetDoutCaps(UINT32 chan, UINT32 *doutcaps, UINT32 nInstance = 0);
 //          cbRESULT_NOLIBRARY if the library was not properly initialized.
 
 
-cbRESULT cbGetDoutOptions(UINT32 chan, UINT32 *options, UINT32 *monchan, UINT32 *doutval, UINT32 nInstance = 0);
-cbRESULT cbSetDoutOptions(UINT32 chan, UINT32 options, UINT32 monchan, UINT32 doutval, UINT32 nInstance = 0);
+cbRESULT cbGetDoutOptions(UINT32 chan, UINT32 *options, UINT32 *monchan, UINT32 *doutval,
+                          UINT8 *triggertype = NULL, UINT16 *trigchan = NULL, UINT16 *trigval = NULL, UINT32 nInstance = 0);
+cbRESULT cbSetDoutOptions(UINT32 chan, UINT32 options, UINT32 monchan, UINT32 doutval,
+                          UINT8 triggertype = cbDOUT_TRIGGER_NONE, UINT16 trigchan = 0, UINT16 trigval = 0, UINT32 nInstance = 0);
 // Get/Set the Digital Output Port options for the specified channel.
 //
 // The only changable DOUT options in this version of the interface libraries are baud rates for
@@ -1084,6 +1100,7 @@ cbRESULT cbSetAinpSpikeHoops(UINT32 chan, cbHOOP *hoops, UINT32 nInstance = 0);
 #define  cbAOUT_MONITORSPK   0x00000080  // Monitor an analog signal line - spike
 #define  cbAOUT_STIMULATE    0x00000100  // Stimulation waveform functions are available.
 #define  cbAOUT_WAVEFORM     0x00000200  // Custom Waveform
+#define  cbAOUT_EXTENSION    0x00000400  // Output Waveform from Extension
 
 #ifdef __cplusplus
 cbRESULT cbGetAoutCaps(UINT32 chan, UINT32 *aoutcaps, cbSCALING *physcalout, cbFILTDESC *phyfiltout, UINT32 nInstance = 0);
@@ -1374,16 +1391,18 @@ typedef struct {
 } cbPKT_VIDEOTRACK;
 
 
-#define cbLOG_MODE_NONE         0  // Normal log
-#define cbLOG_MODE_CRITICAL     1  // Critical log
-#define cbLOG_MODE_RPC          2  // PC->NSP: Remote Procedure Call (RPC)
-#define cbLOG_MODE_PLUGINFO     3  // NSP->PC: Plugin information
-#define cbLOG_MODE_RPC_RES      4  // NSP->PC: Remote Procedure Call Results
-#define cbLOG_MODE_PLUGINERR    5  // NSP->PC: Plugin error information
-#define cbLOG_MODE_RPC_END      6  // NSP->PC: Last RPC packet 
-#define cbLOG_MODE_RPC_KILL     7  // PC->NSP: terminate last RPC
-#define cbLOG_MODE_RPC_INPUT    8  // PC->NSP: RPC command input
-#define cbLOG_MODE_UPLOAD_RES   9  // NSP->PC: Upload result
+#define cbLOG_MODE_NONE         0   // Normal log
+#define cbLOG_MODE_CRITICAL     1   // Critical log
+#define cbLOG_MODE_RPC          2   // PC->NSP: Remote Procedure Call (RPC)
+#define cbLOG_MODE_PLUGINFO     3   // NSP->PC: Plugin information
+#define cbLOG_MODE_RPC_RES      4   // NSP->PC: Remote Procedure Call Results
+#define cbLOG_MODE_PLUGINERR    5   // NSP->PC: Plugin error information
+#define cbLOG_MODE_RPC_END      6   // NSP->PC: Last RPC packet
+#define cbLOG_MODE_RPC_KILL     7   // PC->NSP: terminate last RPC
+#define cbLOG_MODE_RPC_INPUT    8   // PC->NSP: RPC command input
+#define cbLOG_MODE_UPLOAD_RES   9   // NSP->PC: Upload result
+#define cbLOG_MODE_ENDPLUGIN   10   // PC->NSP: Signal the plugin to end
+#define cbLOG_MODE_NSP_REBOOT  11   // PC->NSP: Reboot the NSP
 
 // Reconfiguration log event
 #define cbMAX_LOG          128  // Maximum log description
@@ -1879,13 +1898,13 @@ typedef struct {
     char   label[cbLEN_STR_LABEL];  // sampling group label
     UINT32 period;     // sampling period for the group
     UINT32 length;     //
-    UINT32 list[cbNUM_ANALOG_CHANS];   // variable length list. The max size is
+    UINT16 list[cbNUM_ANALOG_CHANS];   // variable length list. The max size is
                                        // the total number of analog channels
 } cbPKT_GROUPINFO;
 
 #ifdef __cplusplus
 cbRESULT cbGetSampleGroupInfo(UINT32 proc, UINT32 group, char *label, UINT32 *period, UINT32 *length, UINT32 nInstance = 0);
-cbRESULT cbGetSampleGroupList(UINT32 proc, UINT32 group, UINT32 *length, UINT32 *list, UINT32 nInstance = 0);
+cbRESULT cbGetSampleGroupList(UINT32 proc, UINT32 group, UINT32 *length, UINT16 *list, UINT32 nInstance = 0);
 cbRESULT cbSetSampleGroupOptions(UINT32 proc, UINT32 group, UINT32 period, char *label, UINT32 nInstance = 0);
 // Retreives the Sample Group information in a processor and their definitions
 // Labels are 16-characters maximum.
@@ -2983,7 +3002,7 @@ enum WM_USER_GLOBAL
 #endif
 
 
-#define cbRECBUFFLEN 4194304
+#define cbRECBUFFLEN   cbNUM_FE_CHANS * 32768 * 4
 typedef struct {
     UINT32 received;
     UINT32 lasttime;
@@ -3036,6 +3055,9 @@ typedef struct {
 
 } cbSPIKE_SORTING;
 
+#define PCSTAT_TYPE_CERVELLO        0x00000001      // Cervello type system
+#define PCSTAT_DISABLE_RAW          0x00000002      // Disable recording of raw data
+
 class cbPcStatus
 {
 public:
@@ -3043,15 +3065,52 @@ public:
 
 private:
     INT32 m_iBlockRecording;
+    UINT32 m_nPCStatusFlags;
+
+    UINT32 m_nNumFEChans;           // number of each type of channels received from the instrument
+    UINT32 m_nNumAnainChans;
+    UINT32 m_nNumAnalogChans;
+    UINT32 m_nNumAoutChans;
+    UINT32 m_nNumAudioChans;
+    UINT32 m_nNumAnalogoutChans;
+    UINT32 m_nNumDiginChans;
+    UINT32 m_nNumSerialChans;
+    UINT32 m_nNumDigoutChans;
+    UINT32 m_nNumTotalChans;
 
 public:
     cbPcStatus() :
         m_iBlockRecording(0),
-        isSelection(1)
+        isSelection(1),
+        m_nPCStatusFlags(0)
         {
         }
     bool IsRecordingBlocked() { return m_iBlockRecording != 0; }
     void SetBlockRecording(bool bBlockRecording) { m_iBlockRecording += bBlockRecording ? 1 : -1; }
+    UINT32 cbGetPCStatusFlags() { return m_nPCStatusFlags; }
+    void cbSetPCStatusFlags(UINT32 nPCStatusFlags) { m_nPCStatusFlags = nPCStatusFlags; }
+
+    UINT32 cbGetNumFEChans()        { return m_nNumFEChans; }
+    UINT32 cbGetNumAnainChans()     { return m_nNumAnainChans; }
+    UINT32 cbGetNumAnalogChans()    { return m_nNumAnalogChans; }
+    UINT32 cbGetNumAoutChans()      { return m_nNumAoutChans; }
+    UINT32 cbGetNumAudioChans()     { return m_nNumAudioChans; }
+    UINT32 cbGetNumAnalogoutChans() { return m_nNumAnalogoutChans; }
+    UINT32 cbGetNumDiginChans()     { return m_nNumDiginChans; }
+    UINT32 cbGetNumSerialChans()    { return m_nNumSerialChans; }
+    UINT32 cbGetNumDigoutChans()    { return m_nNumDigoutChans; }
+    UINT32 cbGetNumTotalChans()     { return m_nNumTotalChans; }
+
+    void cbSetNumFEChans(UINT32 nNumFEChans)                { m_nNumFEChans = nNumFEChans; }
+    void cbSetNumAnainChans(UINT32 nNumAnainChans)          { m_nNumAnainChans = nNumAnainChans; }
+    void cbSetNumAnalogChans(UINT32 nNumAnalogChans)        { m_nNumAnalogChans = nNumAnalogChans; }
+    void cbSetNumAoutChans(UINT32 nNumAoutChans)            { m_nNumAoutChans = nNumAoutChans; }
+    void cbSetNumAudioChans(UINT32 nNumAudioChans)          { m_nNumAudioChans = nNumAudioChans; }
+    void cbSetNumAnalogoutChans(UINT32 nNumAnalogoutChans)  { m_nNumAnalogoutChans = nNumAnalogoutChans; }
+    void cbSetNumDiginChans(UINT32 nNumDiginChans)        { m_nNumDiginChans = nNumDiginChans; }
+    void cbSetNumSerialChans(UINT32 nNumSerialChans)        { m_nNumSerialChans = nNumSerialChans; }
+    void cbSetNumDigoutChans(UINT32 nNumDigoutChans)        { m_nNumDigoutChans = nNumDigoutChans; }
+    void cbSetNumTotalChans(UINT32 nNumTotalChans)          { m_nNumTotalChans = nNumTotalChans; }
 };
 
 typedef struct {
@@ -3135,4 +3194,3 @@ extern UINT32       cb_library_index[cbMAXOPEN];
 #pragma pack(pop)
 
 #endif      // end of include guard
-

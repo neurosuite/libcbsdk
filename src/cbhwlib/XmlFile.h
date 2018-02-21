@@ -1,4 +1,4 @@
-/* =STS=> XmlFile.h[2739].aa05   open     SMID:5 */
+/* =STS=> XmlFile.h[5504].aa00   submit   SMID:1 */
 //////////////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2010 - 2011 Blackrock Microsystems
@@ -56,7 +56,7 @@ private:
     QList<QDomElement> m_nodes; // a list of the elements currently traversed in the tree
     QList<int> m_levels;        // a list of the levels currently traversed in the tree
     QDomDocument m_doc; // xml document
-    QString m_fname; // XML filename 
+    QString m_fname; // XML filename
     bool m_bError; // If File is empty
 };
 

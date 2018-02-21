@@ -1,4 +1,4 @@
-/* =STS=> CCFUtilsXmlItemsGenerate.h[4880].aa01   open     SMID:1 */
+/* =STS=> CCFUtilsXmlItemsGenerate.h[4880].aa00   closed   SMID:1 */
 //////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2012 - 2013 Blackrock Microsystems

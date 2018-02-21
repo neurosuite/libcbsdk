@@ -1,7 +1,7 @@
-// =STS=> InstNetwork.cpp[2732].aa08   open     SMID:8
+// =STS=> InstNetwork.cpp[5501].aa00   submit   SMID:1 
 //////////////////////////////////////////////////////////////////////////////
 //
-// (c) Copyright 2010 - 2011 Blackrock Microsystems
+// (c) Copyright 2010 - 2013 Blackrock Microsystems
 //
 // $Workfile: InstNetwork.cpp $
 // $Archive: /common/InstNetwork.cpp $
@@ -39,7 +39,7 @@ InstNetwork::InstNetwork(STARTUP_OPTIONS startupOption) :
             m_nInstance(0), m_nInPort(NSP_IN_PORT), m_nOutPort(NSP_OUT_PORT),
             m_bBroadcast(false), m_bDontRoute(true), m_bNonBlocking(true),
             m_nRecBufSize(NSP_REC_BUF_SIZE),
-            m_strInIP(NSP_IN_ADDRESS), m_strOutIP(NSP_OUT_ADDRESS)
+            m_strInIP(NSP_IN_ADDRESS), m_strOutIP(NSP_OUT_ADDRESS), m_bInitChanCount(false)
 {
 
     qRegisterMetaType<NetEventType>("NetEventType"); // For QT connect to recognize this type
@@ -116,6 +116,65 @@ void InstNetwork::OnNetCommand(NetCommandType cmd, unsigned int /*code*/)
     }
 }
 
+void InstNetwork::SetNumChans()
+{
+    UINT32 nChan;
+    UINT32 nCaps;
+    UINT32 nAoutCaps;
+    UINT32 nDinpCaps;
+    UINT32 nNumFEChans = 0;
+    UINT32 nNumAnainChans = 0;
+    UINT32 nNumAoutChans = 0;
+    UINT32 nNumAudioChans = 0;
+    UINT32 nNumDiginChans = 0;
+    UINT32 nNumSerialChans = 0;
+    UINT32 nNumDigoutChans = 0;
+
+    if (!m_bInitChanCount)
+    {
+        cbPROCINFO isProcInfo;
+        memset(&isProcInfo, 0, sizeof(cbPROCINFO));
+        ::cbGetProcInfo(cbNSP1, &isProcInfo);
+        if (0 != isProcInfo.chancount)
+            m_bInitChanCount = true;
+        for (nChan = 1; nChan <= isProcInfo.chancount; ++nChan)
+        {
+            if (cbRESULT_OK == (::cbGetChanCaps(nChan, &nCaps) + 
+                ::cbGetAoutCaps(nChan, &nAoutCaps, NULL, NULL) + 
+                ::cbGetDinpCaps(nChan, &nDinpCaps)))
+            {
+                if ((cbCHAN_EXISTS | cbCHAN_CONNECTED) == (nCaps & (cbCHAN_EXISTS | cbCHAN_CONNECTED)))
+                {
+                    if ((cbCHAN_AINP | cbCHAN_ISOLATED) == (nCaps & (cbCHAN_AINP | cbCHAN_ISOLATED)))
+                        nNumFEChans++;
+                    if ((cbCHAN_AINP) == (nCaps & (cbCHAN_AINP | cbCHAN_ISOLATED)))
+                        nNumAnainChans++;
+                    if (cbCHAN_AOUT == (nCaps & cbCHAN_AOUT) && (cbAOUT_AUDIO != (nAoutCaps & cbAOUT_AUDIO)))
+                        nNumAoutChans++;
+                    if (cbCHAN_AOUT == (nCaps & cbCHAN_AOUT) && (cbAOUT_AUDIO == (nAoutCaps & cbAOUT_AUDIO)))
+                        nNumAudioChans++;
+                    if (cbCHAN_DINP == (nCaps & cbCHAN_DINP) && (nDinpCaps & cbDINP_MASK))
+                        nNumDiginChans++;
+                    if (cbCHAN_DINP == (nCaps & cbCHAN_DINP) && (nDinpCaps & cbDINP_SERIALMASK))
+                        nNumSerialChans++;
+                    else if (cbCHAN_DOUT == (nCaps & cbCHAN_DOUT))
+                        nNumDigoutChans++;
+                }
+            }
+        }
+        cb_pc_status_buffer_ptr[0]->cbSetNumFEChans(nNumFEChans);
+        cb_pc_status_buffer_ptr[0]->cbSetNumAnainChans(nNumAnainChans);
+        cb_pc_status_buffer_ptr[0]->cbSetNumAnalogChans(nNumFEChans + nNumAnainChans);
+        cb_pc_status_buffer_ptr[0]->cbSetNumAoutChans(nNumAoutChans);
+        cb_pc_status_buffer_ptr[0]->cbSetNumAudioChans(nNumAudioChans);
+        cb_pc_status_buffer_ptr[0]->cbSetNumAnalogoutChans(nNumAoutChans + nNumAudioChans);
+        cb_pc_status_buffer_ptr[0]->cbSetNumDiginChans(nNumDiginChans);
+        cb_pc_status_buffer_ptr[0]->cbSetNumSerialChans(nNumSerialChans);
+        cb_pc_status_buffer_ptr[0]->cbSetNumDigoutChans(nNumDigoutChans);
+        cb_pc_status_buffer_ptr[0]->cbSetNumTotalChans(nNumFEChans + nNumAnainChans + nNumAoutChans + nNumAudioChans + nNumDiginChans + nNumSerialChans + nNumDigoutChans);
+    }
+}
+
 // Author & Date: Ehsan Azar       24 June 2010
 // Purpose: Some packets coming from the stand-alone instrument network need
 //           to be processed for any listener application.
@@ -143,7 +202,7 @@ void InstNetwork::ProcessIncomingPacket(const cbPKT_GENERIC * const pPkt)
                         if (pPkt->type == cbPKTTYPE_CHANREP)
                         {
                             // Invalidate the cache
-                            if (chan <= cbNUM_ANALOG_CHANS)
+                            if (chan <= cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans())
                                 cb_spk_buffer_ptr[m_nIdx]->cache[chan - 1].valid = 0;
                         }
                     }
@@ -157,6 +216,7 @@ void InstNetwork::ProcessIncomingPacket(const cbPKT_GENERIC * const pPkt)
                     cbPKT_SYSINFO & rOld = cb_cfg_buffer_ptr[m_nIdx]->sysinfo;
                     // replace our copy with this one
                     rOld = *pNew;
+                    SetNumChans();
                 }
                 // Rely on the fact that sysrep must be the last config packet sent via NSP6.04 and upwards
                 if (pPkt->type == cbPKTTYPE_SYSREP)
@@ -344,11 +404,12 @@ void InstNetwork::ProcessIncomingPacket(const cbPKT_GENERIC * const pPkt)
             {
                 if (m_bStandAlone)
                 {
+                    SetNumChans();
                     const cbPKT_AOUT_WAVEFORM * pPktAoutWave = reinterpret_cast<const cbPKT_AOUT_WAVEFORM *>(pPkt);
                     UINT16 nChan = pPktAoutWave->chan;
-                    if (nChan > cbFIRST_ANAOUT_CHAN)
+                    if (IsChanAnalogOut(nChan))
                     {
-                        nChan -= (cbFIRST_ANAOUT_CHAN + 1);
+                        nChan -= (cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans() + 1);
                         if (nChan < AOUT_NUM_GAIN_CHANS)
                         {
                             UINT8 trigNum = pPktAoutWave->trigNum;
@@ -679,15 +740,15 @@ void InstNetwork::run()
 
     m_nIdx = cb_library_index[m_nInstance];
 
-    // Open the cbhwlib library and create the shared objects
-    cbRESULT cbRet = cbOpen(FALSE, m_nInstance);
-    if (cbRet == cbRESULT_OK)
+    if (cbOpen(FALSE, m_nInstance) == cbRESULT_OK)
     {
         m_nIdx = cb_library_index[m_nInstance];
         m_bStandAlone = false;
         InstNetworkEvent(NET_EVENT_NETCLIENT); // Client to the Central application
-    } else if (cbRet == cbRESULT_NOCENTRALAPP) { // If Central is not running run as stand alone
+    } else { // If Central is not running run as stand alone
         m_bStandAlone = true; // Run stand alone without Central
+        // Open the cbhwlib library and create the shared objects
+        cbRESULT cbRet;
         // Run as stand-alone application
         cbRet = cbOpen(TRUE, m_nInstance);
         if (cbRet)
@@ -697,10 +758,6 @@ void InstNetwork::run()
         }
         m_nIdx = cb_library_index[m_nInstance];
         InstNetworkEvent(NET_EVENT_NETSTANDALONE); // Stand-alone application
-    } else {
-        // Report error and quit
-        InstNetworkEvent(NET_EVENT_CBERR, cbRet);
-        return;
     }
 
     STARTUP_OPTIONS startupOption = m_nStartupOptionsFlags;
@@ -751,7 +808,9 @@ void InstNetwork::run()
         m_timerId = startTimer(10);
         // Start the message loop
         exec();
-    } else { // else wait for central application data
+    } 
+    else 
+    { // else wait for central application data
         // Instrument info for non-stand-alone
         InstNetworkEvent(NET_EVENT_INSTINFO, m_instInfo);
         bool bMonitorThreadMessageWaiting = false; // If message is waiting in non stand-alone mode
@@ -759,7 +818,7 @@ void InstNetwork::run()
         // Start the network loop
         while (!m_bDone)
         {
-            cbRESULT waitresult = cbWaitforData(m_nInstance);   //hls );
+            cbRESULT waitresult = cbWaitforData(m_nInstance);
             if (waitresult == cbRESULT_NOCENTRALAPP)
             {
                 // No instrument anymore
@@ -816,7 +875,9 @@ void InstNetwork::OnWaitEvent()
             cbMakePacketReadingBeginNow(m_nInstance);
             InstNetworkEvent(NET_EVENT_CRITICAL);
             break;
-        } else {
+        } 
+        else 
+        {
             ProcessIncomingPacket(pktptr);
         }
     }

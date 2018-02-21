@@ -1,10 +1,17 @@
-/* =STS=> resource.h[2463].aa02   open     SMID:2 */
+/* =STS=> resource.h[2463].aa02   submit   SMID:3 */
 //{{NO_DEPENDENCIES}}
 // Microsoft Developer Studio generated include file.
 // Used by cbMex.rc
 //
 
 #define IDR_MAINFRAME                   128
+#define IDC_PIC_UDI                     987
+#define IDB_BITMAP_UDI                  988
+#define IDC_STATIC_SUITE_VERSION        989
+#define IDS_DATEBUILT                   990
+#define IDC_STATIC_DATE_BUILT           991
+#define IDS_COPYRIGHT                   992
+#define IDC_STATIC_COPYRIGHT            993
 #define IDC_STATIC_NSP_ID               994
 #define IDS_COPYRIGHT_FROM              995
 #define IDS_APPNAME                     996

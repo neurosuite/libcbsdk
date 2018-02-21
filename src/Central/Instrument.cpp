@@ -1,4 +1,4 @@
-// =STS=> Instrument.cpp[1728].aa15   open     SMID:15 
+// =STS=> Instrument.cpp[1728].aa18   submit   SMID:19 
 //////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2003-2008 Cyberkinetics, Inc.
@@ -109,7 +109,7 @@ cbRESULT Instrument::Open(STARTUP_OPTIONS nStartupOptionsFlags, bool bBroadcast,
         // Do nothing. _cprintf is defined as printf
 #endif
     }
-    else if (OPT_LOCAL == nStartupOptionsFlags)
+    if ((OPT_LOCAL == nStartupOptionsFlags) || (OPT_LOOPBACK == nStartupOptionsFlags))
     {
         // If local instrument then connect to it
         szInIP  = LOOPBACK_ADDRESS;

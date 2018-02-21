@@ -1,7 +1,7 @@
-// =STS=> UDPsocket.cpp[1732].aa11   open     SMID:11 
 //////////////////////////////////////////////////////////////////////
 //
-// (c) Copyright 2003 Cyberkinetics, Inc.
+// (c) Copyright 2003 - 2008 Cyberkinetics, Inc.
+// (c) Copyright 2008 - 2017 Blackrock Microsystems, LLC
 //
 // $Workfile: UDPsocket.cpp $
 // $Archive: /Cerebus/WindowsApps/Central/UDPsocket.cpp $
@@ -106,6 +106,15 @@ cbRESULT UDPSocket::Open(STARTUP_OPTIONS nStartupOptionsFlags, int nRange, bool 
     if (bDontRoute)
     {
         if (setsockopt(inst_sock, SOL_SOCKET, SO_DONTROUTE, (char*)&opt_val, opt_len) != 0)
+        {
+            Close();
+            return cbRESULT_SOCKOPTERR;
+        }
+    }
+
+    if (OPT_REUSE == nStartupOptionsFlags)
+    {
+        if (setsockopt(inst_sock, SOL_SOCKET, SO_REUSEADDR, (char*)&opt_val, opt_len) != 0)
         {
             Close();
             return cbRESULT_SOCKOPTERR;

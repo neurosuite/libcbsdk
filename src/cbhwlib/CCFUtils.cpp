@@ -1,8 +1,8 @@
-// =STS=> CCFUtils.cpp[1691].aa28   open     SMID:29 
+// =STS=> CCFUtils.cpp[1691].aa31   submit   SMID:33 
 //////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2003-2008 Cyberkinetics, Inc.
-// (c) Copyright 2008-2013 Blackrock Microsystems
+// (c) Copyright 2008-2014 Blackrock Microsystems
 //
 // $Workfile: CCFUtils.cpp $
 // $Archive: /Cerebus/Human/WindowsApps/cbhwlib/CCFUtils.cpp $
@@ -106,7 +106,7 @@ ccfResult CCFUtils::SendCCF()
             data.isSS_Statistics.type = cbPKTTYPE_SS_STATISTICSSET;
             cbSendPacket(&data.isSS_Statistics, m_nInstance);
         }
-        for (int i = 0; i < cbNUM_ANALOG_CHANS; ++i)
+        for (int i = 0; i < cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans(); ++i)
         {
             if (data.isSS_NoiseBoundary[i].chan)
             {
@@ -359,13 +359,13 @@ void CCFUtils::ReadCCFOfNSP()
 
     cbCCF & data = dynamic_cast<ccfXml *>(m_pImpl)->m_data;
     for (int i = 0; i < cbNUM_DIGITAL_FILTERS; ++i)
-        data.filtinfo[i] = cb_cfg_buffer_ptr[nIdx]->filtinfo[0][cbFIRST_DIGITAL_FILTER + i];
+        data.filtinfo[i] = cb_cfg_buffer_ptr[nIdx]->filtinfo[0][cbFIRST_DIGITAL_FILTER + i - 1];    // First is 1 based, but index is 0 based
     for (int i = 0; i < cbMAXCHANS; ++i)
         data.isChan[i] = cb_cfg_buffer_ptr[nIdx]->chaninfo[i];
     data.isAdaptInfo = cb_cfg_buffer_ptr[nIdx]->adaptinfo;
     data.isSS_Detect = cb_cfg_buffer_ptr[nIdx]->isSortingOptions.pktDetect;
     data.isSS_ArtifactReject = cb_cfg_buffer_ptr[nIdx]->isSortingOptions.pktArtifReject;
-    for (int i = 0; i < cbNUM_ANALOG_CHANS; ++i)
+    for (int i = 0; i < cb_pc_status_buffer_ptr[0]->cbGetNumAnalogChans(); ++i)
         data.isSS_NoiseBoundary[i] = cb_cfg_buffer_ptr[nIdx]->isSortingOptions.pktNoiseBoundary[i];
     data.isSS_Statistics = cb_cfg_buffer_ptr[nIdx]->isSortingOptions.pktStatistics;
     {
@@ -390,6 +390,9 @@ void CCFUtils::ReadCCFOfNSP()
             data.isWaveform[i][j].active = 0;
         }
     }
+    // Take a copy if needed
+    if (m_pCCF)
+        *m_pCCF = dynamic_cast<ccfXml *>(m_pImpl)->m_data;
 }
 
 // Author & Date:   Ehsan Azar   12 April 2012

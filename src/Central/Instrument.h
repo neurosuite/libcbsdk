@@ -1,4 +1,4 @@
-/* =STS=> Instrument.h[1729].aa09   open     SMID:10 */
+/* =STS=> Instrument.h[1729].aa13   submit   SMID:15 */
 //////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2003 Cyberkinetics, Inc.

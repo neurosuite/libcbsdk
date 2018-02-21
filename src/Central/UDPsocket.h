@@ -1,4 +1,4 @@
-/* =STS=> UDPsocket.h[1733].aa07   open     SMID:7 */
+/* =STS=> UDPsocket.h[1733].aa08   submit   SMID:8 */
 //////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2003 Cyberkinetics, Inc.

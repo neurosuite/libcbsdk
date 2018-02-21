@@ -1,4 +1,4 @@
-/* =STS=> debugmacs.h[1694].aa08   open     SMID:9 */
+/* =STS=> debugmacs.h[1694].aa08   submit   SMID:10 */
 //////////////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2003-2008 Cyberkinetics, Inc.

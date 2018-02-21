@@ -1,4 +1,4 @@
-/* =STS=> CCFUtilsXmlItemsParse.h[4881].aa02   open     SMID:2 */
+/* =STS=> CCFUtilsXmlItemsParse.h[4881].aa02   submit   SMID:3 */
 //////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2012 - 2013 Blackrock Microsystems

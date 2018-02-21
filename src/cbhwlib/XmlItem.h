@@ -1,3 +1,4 @@
+/* =STS=> XmlItem.h[5505].aa00   submit   SMID:1 */
 //////////////////////////////////////////////////////////////////////////////
 //
 // (c) Copyright 2011 - 2012 Blackrock Microsystems
@@ -14,7 +15,7 @@
 //
 // PURPOSE:
 //
-// Common XML element 
+// Common XML element
 //
 
 #ifndef XMLITEM_H_INCLUDED
