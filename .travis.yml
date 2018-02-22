@@ -20,7 +20,7 @@ matrix:
         packages:
           - libqt4-dev
   - os: linux
-    env: QT_VERSION=qt5
+    env: QT_VERSION=qt5 TRAVIS_DEPLOY=y
     compiler: clang
     addons:
       apt:
@@ -55,4 +55,4 @@ deploy:
   file: "${TRAVIS_BUILD_DIR}/build/libcbsdk_*.deb"
   on:
     tags: true
-    condition: "$TRAVIS_OS_NAME = linux && $QT_VERSION = qt5"
+    condition: "$TRAVIS_DEPLOY = y"
