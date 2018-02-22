@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/neurosuite/libcbsdk.svg)](https://travis-ci.org/neurosuite/libcbsdk)
-[![Build status](https://ci.appveyor.com/api/projects/status/lf503790q0pg8pkw/branch/master?svg=true)](https://ci.appveyor.com/project/FloFra/libcbsdk/branch/master)
+[![Build status](https://ci.appveyor.com/api/projects/status/amf7shp3fq7y2rp7/branch/master?svg=true)](https://ci.appveyor.com/project/FlorianFranzen/libcbsdk/branch/master)
 
 libcbsdk
 ========
