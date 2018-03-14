@@ -2909,12 +2909,6 @@ cbRESULT cbCheckforData(cbLevelOfConcern & nLevelOfConcern, UINT32 *pktstogo /* 
 
     nLevelOfConcern = static_cast<cbLevelOfConcern>( (nDiff * LOC_COUNT) / cbRECBUFFLEN );
 
-    // make sure to return a valid value
-    if (nLevelOfConcern < LOC_LOW)
-        nLevelOfConcern = LOC_LOW;
-    if (nLevelOfConcern > LOC_CRITICAL)
-        nLevelOfConcern = LOC_CRITICAL;
-
     return cbRESULT_OK;
 }
 

@@ -3002,7 +3002,7 @@ enum WM_USER_GLOBAL
 #endif
 
 
-#define cbRECBUFFLEN   cbNUM_FE_CHANS * 32768 * 4
+#define cbRECBUFFLEN  (cbNUM_FE_CHANS * 32768 * 4)
 typedef struct {
     UINT32 received;
     UINT32 lasttime;
